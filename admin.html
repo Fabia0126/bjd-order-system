@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BJD订单管理后台</title>
+    <link rel="stylesheet" href="admin.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <!-- 登录遮罩 -->
+    <div id="loginOverlay" style="position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(135deg,#eea8cc 0%,#a2dbee 50%,#efe59d 100%);z-index:9999;display:flex;align-items:center;justify-content:center;">
+        <div style="background:white;padding:40px;border-radius:20px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,0.15);max-width:320px;width:90%;">
+            <h2 style="color:#d485a8;margin-bottom:20px;">🔐 后台登录</h2>
+            <input type="password" id="adminPassword" placeholder="请输入密码" style="width:100%;padding:14px;border:2px solid #e8e0eb;border-radius:10px;font-size:16px;margin-bottom:16px;box-sizing:border-box;" onkeypress="if(event.key==='Enter')checkPassword()">
+            <button onclick="checkPassword()" style="width:100%;padding:14px;background:linear-gradient(135deg,#d485a8 0%,#c08db8 100%);color:white;border:none;border-radius:10px;font-size:16px;cursor:pointer;">进入后台</button>
+            <p id="loginError" style="color:#dc3545;margin-top:12px;display:none;">密码错误</p>
+        </div>
+    </div>
+    <script>
+        function checkPassword() {
+            const pwd = document.getElementById('adminPassword').value;
+            if (pwd === 'Fafaluxun20260126.') {
+                document.getElementById('loginOverlay').style.display = 'none';
+                sessionStorage.setItem('bjd_admin_auth', 'true');
+            } else {
+                document.getElementById('loginError').style.display = 'block';
+                document.getElementById('adminPassword').value = '';
+            }
+        }
+        if (sessionStorage.getItem('bjd_admin_auth') === 'true') {
+            document.getElementById('loginOverlay').style.display = 'none';
+        }
+    </script>
+
+    <div class="container">
+        <header>
+            <h1>BJD订单管理后台</h1>
+            <div class="header-actions">
+                <button class="btn-export" onclick="exportOrders()">导出表格</button>
+                <button class="btn-settings" onclick="openSettings()">普单设置</button>
+            </div>
+        </header>
+
+        <!-- 统计卡片 -->
+        <div class="stats-row">
+            <div class="stat-card">
+                <span class="stat-number" id="statPending">0</span>
+                <span class="stat-label">待审核</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-number" id="statApproved">0</span>
+                <span class="stat-label">已通过</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-number" id="statWorking">0</span>
+                <span class="stat-label">施工中</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-number" id="statCompleted">0</span>
+                <span class="stat-label">已完成</span>
+            </div>
+        </div>
+
+        <!-- 筛选标签 -->
+        <div class="filter-tabs">
+            <button class="tab active" data-filter="all">全部</button>
+            <button class="tab" data-filter="pending">待审核</button>
+            <button class="tab" data-filter="approved">等待中</button>
+            <button class="tab" data-filter="working">施工中</button>
+            <button class="tab" data-filter="packing">待打包</button>
+            <button class="tab" data-filter="completed">已完成</button>
+            <button class="tab" data-filter="rejected">已拒绝</button>
+        </div>
+
+        <!-- 订单列表 -->
+        <div class="order-list" id="orderList">
+            <div class="empty-state">
+                <p>暂无订单</p>
+                <p class="hint">客户提交小纸条后会显示在这里</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 订单详情弹窗 -->
+    <div class="modal" id="orderModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>订单详情</h2>
+                <button class="close-btn" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="orderDetail">
+                <!-- 动态填充 -->
+            </div>
+            <div class="modal-footer" id="orderActions">
+                <!-- 动态填充 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 普单设置弹窗 -->
+    <div class="modal" id="settingsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>普单设置</h2>
+                <button class="close-btn" onclick="closeSettings()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="setting-item">
+                    <label>普单状态</label>
+                    <div class="toggle-group">
+                        <button class="toggle-btn" id="normalOn" onclick="setNormalStatus(true)">开放</button>
+                        <button class="toggle-btn" id="normalOff" onclick="setNormalStatus(false)">关闭</button>
+                    </div>
+                </div>
+                <div class="setting-item">
+                    <label>普单上限（0=不限）</label>
+                    <input type="number" id="normalLimit" min="0" value="0" onchange="saveSettings()">
+                </div>
+                <div class="setting-item">
+                    <label>定时开放</label>
+                    <input type="datetime-local" id="normalOpenTime" onchange="saveSettings()">
+                </div>
+                <p class="setting-hint">当前普单数：<span id="currentNormalCount">0</span></p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-primary" onclick="closeSettings()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="admin.js"></script>
+</body>
+</html>

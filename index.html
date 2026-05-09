@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BJD送妆小纸条</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>BJD送妆小纸条</h1>
+            <p class="subtitle">填写完成后请截图/复制，凭订单编号去闲鱼拍万能拍</p>
+        </header>
+
+        <form id="orderForm">
+            <!-- 价格显示 -->
+            <div class="price-display">
+                <span>预估总价：</span>
+                <span id="totalPrice">¥0</span>
+            </div>
+
+            <!-- 1. 订单类别 -->
+            <section class="form-section">
+                <h2>订单类别</h2>
+                <div class="radio-group">
+                    <label class="radio-card">
+                        <input type="radio" name="orderType" value="normal" checked>
+                        <span class="card-content">
+                            <span class="card-title">普单</span>
+                            <span class="card-desc">正常排队</span>
+                        </span>
+                    </label>
+                    <label class="radio-card">
+                        <input type="radio" name="orderType" value="chao">
+                        <span class="card-content">
+                            <span class="card-title">钞能力单</span>
+                            <span class="card-desc">基础价×2，满额时可加塞</span>
+                        </span>
+                    </label>
+                </div>
+                <p class="status-text" id="normalStatus"></p>
+            </section>
+
+            <!-- 2. 尺寸 -->
+            <section class="form-section">
+                <h2>尺寸</h2>
+                <div class="radio-group">
+                    <label class="radio-card">
+                        <input type="radio" name="size" value="3fen" checked>
+                        <span class="card-content">
+                            <span class="card-title">三分</span>
+                        </span>
+                    </label>
+                    <label class="radio-card">
+                        <input type="radio" name="size" value="4fen">
+                        <span class="card-content">
+                            <span class="card-title">四分</span>
+                            <span class="card-desc">基础价-30</span>
+                        </span>
+                    </label>
+                </div>
+            </section>
+
+            <!-- 3. 妆面类别 -->
+            <section class="form-section">
+                <h2>妆面类别</h2>
+                <div class="radio-group">
+                    <label class="radio-card">
+                        <input type="radio" name="makeupType" value="free" checked>
+                        <span class="card-content">
+                            <span class="card-title">全自由妆</span>
+                            <span class="card-price">¥190</span>
+                        </span>
+                    </label>
+                    <label class="radio-card">
+                        <input type="radio" name="makeupType" value="specified">
+                        <span class="card-content">
+                            <span class="card-title">指定妆</span>
+                            <span class="card-price">¥210</span>
+                        </span>
+                    </label>
+                    <label class="radio-card">
+                        <input type="radio" name="makeupType" value="cos">
+                        <span class="card-content">
+                            <span class="card-title">COS妆</span>
+                            <span class="card-price">¥230</span>
+                        </span>
+                    </label>
+                </div>
+                <p class="makeup-hint" id="makeupHint">不可指定色系，无指定要求，可选男养/女养/攻/受，不接受修改，一键出图</p>
+            </section>
+
+            <!-- 4. 娃头信息 -->
+            <section class="form-section">
+                <h2>娃头信息</h2>
+                <div class="form-group">
+                    <label>娃社 + 官名 + 肤色 <span class="required">*</span></label>
+                    <input type="text" name="dollInfo" placeholder="例：龙魂 蓐收 若肉色" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group half">
+                        <label>属性</label>
+                        <select name="attribute">
+                            <option value="">不填</option>
+                            <option value="攻">攻</option>
+                            <option value="受">受</option>
+                        </select>
+                    </div>
+                    <div class="form-group half">
+                        <label>性别</label>
+                        <select name="gender">
+                            <option value="男养">男养</option>
+                            <option value="女养">女养</option>
+                        </select>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 5. 妆面要求 -->
+            <section class="form-section">
+                <h2>妆面要求</h2>
+                <div class="form-group">
+                    <label>色系</label>
+                    <select name="colorScheme" id="colorScheme">
+                        <option value="自由发挥">自由发挥</option>
+                        <option value="黑棕">黑棕</option>
+                        <option value="粉灰">粉灰</option>
+                        <option value="粉棕">粉棕</option>
+                        <option value="白化">白化</option>
+                        <option value="其他">其他（请在要求中说明）</option>
+                    </select>
+                </div>
+
+                <!-- 禁忌 - 仅指定/cos可填 -->
+                <div class="form-group conditional-field" id="tabooSection">
+                    <label>禁忌（最多3条）</label>
+                    <input type="text" name="taboo1" placeholder="禁忌1">
+                    <input type="text" name="taboo2" placeholder="禁忌2">
+                    <input type="text" name="taboo3" placeholder="禁忌3">
+                </div>
+
+                <!-- 要求 - 仅指定/cos可填 -->
+                <div class="form-group conditional-field" id="requirementSection">
+                    <label>要求（最多3条）</label>
+                    <input type="text" name="requirement1" placeholder="要求1">
+                    <input type="text" name="requirement2" placeholder="要求2">
+                    <input type="text" name="requirement3" placeholder="要求3">
+                </div>
+
+                <!-- 参考图 - 仅指定/cos可上传 -->
+                <div class="form-group conditional-field" id="referenceSection">
+                    <label>参考图</label>
+                    <input type="file" name="referenceImages" multiple accept="image/*">
+                    <p class="hint">COS妆需提供清晰无遮挡角色图片</p>
+                </div>
+            </section>
+
+            <!-- 6. 加购 & 免费项 -->
+            <section class="form-section">
+                <h2>加购项</h2>
+                <div class="checkbox-group">
+                    <label class="checkbox-item">
+                        <input type="checkbox" name="addon" value="卸妆" data-price="30">
+                        <span>卸妆 +¥30</span>
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" name="addon" value="睫毛" data-price="5">
+                        <span>睫毛 +¥5</span>
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" name="addon" value="Pan粉去黄" data-price="30">
+                        <span>Pan粉去黄 +¥30</span>
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" name="addon" value="面罩" data-price="5">
+                        <span>面罩 +¥5</span>
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" name="addon" value="疤痕" data-price="25">
+                        <span>疤痕 +¥25</span>
+                    </label>
+                    <label class="checkbox-item has-quantity">
+                        <input type="checkbox" name="addon" value="口配" data-price="15" data-has-quantity="true" id="addonKoupei">
+                        <span>口配 +¥15/个</span>
+                        <input type="number" name="koupeiQty" min="1" max="10" value="1" class="quantity-input" id="koupeiQty" disabled>
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" name="addon" value="重肌理" data-price="30">
+                        <span>重肌理 +¥30</span>
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" name="addon" value="面纹" data-price="0" data-custom-price="true">
+                        <span>面纹（价格待定）</span>
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" name="addon" value="加急" data-price="100">
+                        <span>加急 +¥100</span>
+                    </label>
+                </div>
+
+                <h2>免费项（默认自由发挥，勾选则指定要）</h2>
+                <div class="checkbox-group">
+                    <label class="checkbox-item">
+                        <input type="checkbox" name="freeItem" value="新头帮擦">
+                        <span>新头帮擦</span>
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" name="freeItem" value="光油">
+                        <span>光油</span>
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" name="freeItem" value="闪粉">
+                        <span>闪粉</span>
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" name="freeItem" value="肌理唇纹">
+                        <span>肌理唇纹</span>
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" name="freeItem" value="肌理凝胶">
+                        <span>肌理凝胶</span>
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" name="freeItem" value="点痣贴钉">
+                        <span>点痣贴钉</span>
+                    </label>
+                </div>
+
+                <div class="form-group">
+                    <label>闪粉位置</label>
+                    <select name="glitter">
+                        <option value="否">否</option>
+                        <option value="全脸">全脸</option>
+                        <option value="局部">局部</option>
+                    </select>
+                </div>
+            </section>
+
+            <!-- 7. 物流信息 -->
+            <section class="form-section">
+                <h2>物流信息</h2>
+                <div class="form-group">
+                    <label>随箱物品</label>
+                    <input type="text" name="accessories" placeholder="如：头盖、面罩、睫毛、送妆盒等">
+                </div>
+                <div class="form-group">
+                    <label>闲鱼ID <span class="required">*</span></label>
+                    <input type="text" name="xianyuId" required>
+                </div>
+                <div class="form-group">
+                    <label>收件人全名 <span class="required">*</span></label>
+                    <input type="text" name="receiverName" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group half">
+                        <label>联系方式1 <span class="required">*</span></label>
+                        <input type="text" name="contact1" placeholder="QQ/手机/微信" required>
+                    </div>
+                    <div class="form-group half">
+                        <label>联系方式2 <span class="required">*</span></label>
+                        <input type="text" name="contact2" placeholder="至少填两个以保证联络" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>快递偏好</label>
+                    <input type="text" name="shipping" placeholder="默认顺丰到付，如需保价请注明金额" value="顺丰到付">
+                </div>
+            </section>
+
+            <!-- 8. 注意事项确认 -->
+            <section class="form-section notice-section">
+                <h2>注意事项</h2>
+                <div class="notice-box">
+                    <p><strong>约妆前请务必确认已经看过BJD相关洗白帖，并了解BJD的特性和树脂特点。</strong></p>
+                    <ol>
+                        <li>定妆确认后只可加深不可减淡，定妆后线条无法修改</li>
+                        <li>除一键出图外，仅接受两次修改，超过两次擦花寄回、定金不退</li>
+                        <li>默认打包后返图确认再寄出，快递途中掉妆不负责（建议保价，小磕碰可寄回补妆）</li>
+                        <li>不接：D社、大众雷、明星仿妆、大瑕疵头、打印头、PVC及部分技术原因画不好的头型</li>
+                        <li>无法做到完全对称，是人不是打印机，请勿拿尺子量两边眉毛差几毫米</li>
+                        <li>每次喷消光都会挑灰，但做不到100%无尘</li>
+                        <li>过往作品复刻无法做到完全一样</li>
+                        <li>沟通内容请务必写在纸质版小纸条上，一切以最终纸质版小纸条为准</li>
+                        <li>按排单序号顺序出，工期为排到后30个工作日，连续阴雨天气会适当延长</li>
+                        <li><strong>钞能力＝已满额时额外加塞排队；加急＝已有妆额、缩短工期</strong></li>
+                    </ol>
+                </div>
+                <label class="checkbox-item confirm-checkbox">
+                    <input type="checkbox" name="agreeNotice" id="agreeNotice" required>
+                    <span>我已阅读并同意以上注意事项</span>
+                </label>
+            </section>
+
+            <!-- 提交按钮 -->
+            <div class="submit-section">
+                <div class="price-final">
+                    预估总价：<span id="totalPriceFinal">¥0</span>
+                    <p class="price-note">*面纹价格待店主确认后更新</p>
+                </div>
+                <button type="submit" class="submit-btn" id="submitBtn" disabled>提交小纸条</button>
+            </div>
+        </form>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

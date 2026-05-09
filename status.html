@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>订单查询 - BJD送妆</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        .search-section {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+        .search-section h2 {
+            font-size: 18px;
+            color: #d485a8;
+            margin-bottom: 16px;
+            text-align: center;
+        }
+        .search-input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #e8e0eb;
+            border-radius: 12px;
+            font-size: 16px;
+            margin-bottom: 12px;
+        }
+        .search-input:focus {
+            outline: none;
+            border-color: #d485a8;
+        }
+        .search-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #d485a8 0%, #c08db8 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .search-hint {
+            text-align: center;
+            color: #888;
+            font-size: 13px;
+            margin-top: 12px;
+        }
+        .result-section {
+            display: none;
+        }
+        .result-section.show {
+            display: block;
+        }
+        .order-result {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid #f5f0ff;
+        }
+        .result-id {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+        }
+        .result-status {
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .status-pending { background: #fff3cd; color: #856404; }
+        .status-approved { background: #d4edda; color: #155724; }
+        .status-working { background: #cce5ff; color: #004085; }
+        .status-packing { background: #e2d5f1; color: #5a3d8a; }
+        .status-completed { background: #d1e7dd; color: #0f5132; }
+        .status-rejected { background: #f8d7da; color: #721c24; }
+        .result-info {
+            margin-bottom: 16px;
+        }
+        .info-row {
+            display: flex;
+            padding: 8px 0;
+            border-bottom: 1px solid #f5f5f5;
+        }
+        .info-label {
+            width: 100px;
+            color: #888;
+            font-size: 14px;
+        }
+        .info-value {
+            flex: 1;
+            color: #333;
+            font-size: 14px;
+        }
+        .receipt-box {
+            background: #f8f5fa;
+            border-radius: 12px;
+            padding: 16px;
+            margin-top: 16px;
+        }
+        .receipt-box h3 {
+            font-size: 14px;
+            color: #d485a8;
+            margin-bottom: 12px;
+        }
+        .receipt-text {
+            white-space: pre-wrap;
+            font-family: inherit;
+            font-size: 13px;
+            line-height: 1.8;
+            color: #333;
+        }
+        .copy-btn {
+            width: 100%;
+            padding: 12px;
+            background: #f5f0ff;
+            color: #d485a8;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            margin-top: 12px;
+        }
+        .no-result {
+            background: white;
+            border-radius: 16px;
+            padding: 40px 24px;
+            text-align: center;
+            color: #888;
+        }
+        .back-link {
+            display: block;
+            text-align: center;
+            color: #d485a8;
+            text-decoration: none;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>订单查询</h1>
+            <p class="subtitle">输入闲鱼ID或联系方式查询订单状态</p>
+        </header>
+
+        <div class="search-section">
+            <h2>查询我的订单</h2>
+            <input type="text" class="search-input" id="searchInput" placeholder="输入闲鱼ID或手机号">
+            <button class="search-btn" onclick="searchOrder()">查询</button>
+            <p class="search-hint">请输入下单时填写的闲鱼ID或联系方式</p>
+        </div>
+
+        <div class="result-section" id="resultSection">
+            <!-- 动态填充 -->
+        </div>
+
+        <a href="index.html" class="back-link">← 返回填写小纸条</a>
+    </div>
+
+    <script>
+        // Supabase配置
+        const SUPABASE_URL = 'https://assqothmzcsusnksdnmm.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_2AIuIZyBxU_Mk26yT0GR8w_uxzX4eXZ';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        const STATUS = {
+            pending: '待审核',
+            approved: '等待中',
+            working: '正在施工',
+            packing: '已确认待打包',
+            completed: '订单完成',
+            rejected: '已拒绝'
+        };
+
+        async function searchOrder() {
+            const keyword = document.getElementById('searchInput').value.trim();
+            if (!keyword) {
+                alert('请输入闲鱼ID或联系方式');
+                return;
+            }
+
+            try {
+                const { data: results, error } = await supabase
+                    .from('orders')
+                    .select('*')
+                    .or(`xianyu_id.eq.${keyword},contact1.eq.${keyword},contact2.eq.${keyword},order_id.eq.${keyword}`);
+
+                if (error) throw error;
+                searchResults = results || [];
+
+            const resultSection = document.getElementById('resultSection');
+            resultSection.classList.add('show');
+
+            if (results.length === 0) {
+                resultSection.innerHTML = `
+                    <div class="no-result">
+                        <p>未找到相关订单</p>
+                        <p style="font-size: 13px; margin-top: 8px;">请确认输入的信息与下单时一致</p>
+                    </div>
+                `;
+                return;
+            }
+
+            resultSection.innerHTML = results.map(order => `
+                <div class="order-result">
+                    <div class="result-header">
+                        <span class="result-id">${order.order_id || '编号待生成'}</span>
+                        <span class="result-status status-${order.status}">${STATUS[order.status]}</span>
+                    </div>
+                    <div class="result-info">
+                        <div class="info-row">
+                            <span class="info-label">订单类别</span>
+                            <span class="info-value">${order.order_type}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">妆面类别</span>
+                            <span class="info-value">${order.makeup_type}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">娃头信息</span>
+                            <span class="info-value">${order.doll_info}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">总价</span>
+                            <span class="info-value" style="color: #d485a8; font-weight: 600;">${order.total_price}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">提交时间</span>
+                            <span class="info-value">${formatTime(order.submit_time)}</span>
+                        </div>
+                    </div>
+                    ${order.order_id ? `
+                    <div class="receipt-box">
+                        <h3>回执小纸条（可复制）</h3>
+                        <pre class="receipt-text">${generateReceipt(order)}</pre>
+                        <button class="copy-btn" onclick="copyReceipt('${order.id}')">复制回执</button>
+                    </div>
+                    ` : `
+                    <div class="receipt-box" style="background: #fff8e6;">
+                        <p style="color: #856404; text-align: center;">订单待审核中，审核通过后将生成编号和回执</p>
+                    </div>
+                    `}
+                </div>
+            `).join('');
+            } catch (error) {
+                console.error('查询失败:', error);
+                resultSection.innerHTML = `
+                    <div class="no-result">
+                        <p>查询失败，请稍后重试</p>
+                    </div>
+                `;
+            }
+        }
+
+        function formatTime(timeStr) {
+            const date = new Date(timeStr);
+            return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+        }
+
+        function generateReceipt(order) {
+            let text = `【送妆小纸条】
+序号：${order.order_id}
+订单类别：${order.order_type}
+尺寸：${order.size}
+妆面类别：${order.makeup_type}
+娃社+官名+肤色：${order.doll_info}
+属性：${order.attribute}
+性别：${order.gender}
+色系：${order.color_scheme}`;
+
+            if (order.taboos && order.taboos.length > 0) {
+                text += `\n禁忌：${order.taboos.join('、')}`;
+            }
+            if (order.requirements && order.requirements.length > 0) {
+                text += `\n要求：${order.requirements.join('、')}`;
+            }
+
+            text += `\n加购项：${order.addons && order.addons.length > 0 ? order.addons.join('、') : '无'}`;
+            text += `\n免费项：${order.free_items && order.free_items.length > 0 ? order.free_items.join('、') : '自由发挥'}`;
+            text += `\n闪粉：${order.glitter}`;
+            text += `\n随箱物品：${order.accessories || '无'}`;
+            text += `\n闲鱼ID：${order.xianyu_id}`;
+            text += `\n收件人：${order.receiver_name}`;
+            text += `\n联系方式：${order.contact1} / ${order.contact2}`;
+            text += `\n快递：${order.shipping}`;
+            text += `\n\n总价：${order.total_price}`;
+
+            return text;
+        }
+
+        // 存储查询结果供复制使用
+        let searchResults = [];
+
+        async function copyReceipt(orderId) {
+            const order = searchResults.find(o => o.id === orderId);
+            if (!order) {
+                // 从数据库重新获取
+                const { data, error } = await supabase
+                    .from('orders')
+                    .select('*')
+                    .eq('id', orderId)
+                    .single();
+                if (error || !data) return;
+                order = data;
+            }
+
+            const text = generateReceipt(order);
+            navigator.clipboard.writeText(text).then(() => {
+                alert('回执已复制！请去闲鱼拍万能拍时备注订单编号');
+            }).catch(() => {
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                alert('回执已复制！请去闲鱼拍万能拍时备注订单编号');
+            });
+        }
+
+        // 支持回车查询
+        document.getElementById('searchInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') searchOrder();
+        });
+    </script>
+</body>
+</html>

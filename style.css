@@ -1,0 +1,429 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='70' viewBox='0 0 40 70'%3E%3Cg fill='%23ffffff' fill-opacity='0.12'%3E%3Cpolygon points='20,0 40,35 20,70 0,35'/%3E%3C/g%3E%3Cg fill='%23ffffff' fill-opacity='0.06'%3E%3Ccircle cx='20' cy='35' r='3'/%3E%3C/g%3E%3C/svg%3E"),
+        linear-gradient(135deg, #eea8cc 0%, #a2dbee 50%, #efe59d 100%);
+    background-size: 40px 70px, 100% 100%;
+    min-height: 100vh;
+    color: #333;
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+header {
+    text-align: center;
+    padding: 30px 0;
+}
+
+header h1 {
+    font-size: 28px;
+    color: #d485a8;
+    margin-bottom: 8px;
+}
+
+header .subtitle {
+    color: #888;
+    font-size: 14px;
+}
+
+/* Price Display */
+.price-display {
+    position: sticky;
+    top: 0;
+    background: linear-gradient(135deg, #d485a8 0%, #c08db8 100%);
+    color: white;
+    padding: 15px 20px;
+    border-radius: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 18px;
+    font-weight: 600;
+    z-index: 100;
+    box-shadow: 0 4px 15px rgba(212, 133, 168, 0.3);
+    margin-bottom: 20px;
+}
+
+#totalPrice {
+    font-size: 24px;
+}
+
+/* Form Sections */
+.form-section {
+    background: white;
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.form-section h2 {
+    font-size: 16px;
+    color: #d485a8;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #f5f0ff;
+}
+
+/* Radio Cards */
+.radio-group {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.radio-card {
+    flex: 1;
+    min-width: 120px;
+}
+
+.radio-card input {
+    display: none;
+}
+
+.card-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px 12px;
+    border: 2px solid #e8e0eb;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: #fdfafc;
+}
+
+.radio-card input:checked + .card-content {
+    border-color: #d485a8;
+    background: linear-gradient(135deg, #fdf6f9 0%, #f5f0ff 100%);
+    box-shadow: 0 4px 12px rgba(139, 90, 123, 0.15);
+}
+
+.radio-card input:disabled + .card-content {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: #f5f5f5;
+}
+
+.card-title {
+    font-weight: 600;
+    color: #333;
+    font-size: 15px;
+}
+
+.card-desc {
+    font-size: 12px;
+    color: #888;
+    margin-top: 4px;
+    text-align: center;
+}
+
+.card-price {
+    font-size: 14px;
+    color: #d485a8;
+    font-weight: 600;
+    margin-top: 4px;
+}
+
+/* Status Text */
+.status-text {
+    margin-top: 12px;
+    padding: 10px 14px;
+    background: #fff8e6;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #996600;
+    display: none;
+}
+
+.status-text.show {
+    display: block;
+}
+
+/* Makeup Hint */
+.makeup-hint {
+    margin-top: 12px;
+    padding: 12px 14px;
+    background: #f8f5fa;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #666;
+    border-left: 3px solid #d485a8;
+}
+
+/* Form Groups */
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group:last-child {
+    margin-bottom: 0;
+}
+
+.form-group label {
+    display: block;
+    font-size: 14px;
+    font-weight: 500;
+    color: #555;
+    margin-bottom: 8px;
+}
+
+.required {
+    color: #e74c3c;
+}
+
+.form-group input[type="text"],
+.form-group input[type="number"],
+.form-group select {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1.5px solid #e8e0eb;
+    border-radius: 10px;
+    font-size: 15px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    background: #fdfafc;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: #d485a8;
+    box-shadow: 0 0 0 3px rgba(139, 90, 123, 0.1);
+}
+
+.form-group input::placeholder {
+    color: #bbb;
+}
+
+.form-row {
+    display: flex;
+    gap: 12px;
+}
+
+.form-group.half {
+    flex: 1;
+}
+
+.hint {
+    font-size: 12px;
+    color: #888;
+    margin-top: 6px;
+}
+
+/* Conditional Fields */
+.conditional-field {
+    opacity: 1;
+    transition: opacity 0.3s;
+}
+
+.conditional-field.disabled {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+.conditional-field.disabled input,
+.conditional-field.disabled select {
+    background: #f0f0f0;
+}
+
+.conditional-field input {
+    margin-bottom: 8px;
+}
+
+/* Checkbox Group */
+.checkbox-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.checkbox-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: #fdfafc;
+    border: 1.5px solid #e8e0eb;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 14px;
+}
+
+.checkbox-item:hover {
+    border-color: #d0c0d5;
+}
+
+.checkbox-item input {
+    width: 18px;
+    height: 18px;
+    accent-color: #d485a8;
+}
+
+.checkbox-item input:checked ~ span {
+    color: #d485a8;
+    font-weight: 500;
+}
+
+.checkbox-item.has-quantity {
+    flex-wrap: wrap;
+}
+
+.quantity-input {
+    width: 60px !important;
+    padding: 6px 10px !important;
+    margin-left: 8px;
+    font-size: 14px !important;
+}
+
+.quantity-input:disabled {
+    opacity: 0.5;
+}
+
+/* Notice Section */
+.notice-section {
+    background: #fffbf5;
+}
+
+.notice-box {
+    background: white;
+    border: 1.5px solid #f0e6d8;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+}
+
+.notice-box p {
+    margin-bottom: 12px;
+    color: #996600;
+}
+
+.notice-box ol {
+    padding-left: 20px;
+    color: #666;
+    font-size: 13px;
+}
+
+.notice-box li {
+    margin-bottom: 8px;
+    line-height: 1.5;
+}
+
+.confirm-checkbox {
+    background: #fff8e6 !important;
+    border-color: #f0d080 !important;
+    justify-content: center;
+}
+
+.confirm-checkbox span {
+    font-weight: 500;
+}
+
+/* Submit Section */
+.submit-section {
+    background: white;
+    border-radius: 16px;
+    padding: 24px;
+    text-align: center;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.price-final {
+    font-size: 20px;
+    color: #333;
+    margin-bottom: 16px;
+}
+
+#totalPriceFinal {
+    font-size: 28px;
+    font-weight: 700;
+    color: #d485a8;
+}
+
+.price-note {
+    font-size: 12px;
+    color: #999;
+    margin-top: 4px;
+}
+
+.submit-btn {
+    width: 100%;
+    padding: 16px;
+    background: linear-gradient(135deg, #d485a8 0%, #a06b8b 100%);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 18px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    box-shadow: 0 4px 15px rgba(139, 90, 123, 0.3);
+}
+
+.submit-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(139, 90, 123, 0.4);
+}
+
+.submit-btn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+/* File Input */
+input[type="file"] {
+    padding: 12px;
+    background: #fdfafc;
+    border: 1.5px dashed #d0c0d5;
+    border-radius: 10px;
+    width: 100%;
+    cursor: pointer;
+}
+
+input[type="file"]:hover {
+    border-color: #d485a8;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+    .container {
+        padding: 12px;
+    }
+
+    header h1 {
+        font-size: 24px;
+    }
+
+    .form-section {
+        padding: 18px;
+    }
+
+    .radio-card {
+        min-width: 100px;
+    }
+
+    .form-row {
+        flex-direction: column;
+        gap: 0;
+    }
+
+    .form-group.half {
+        width: 100%;
+    }
+
+    .checkbox-item {
+        width: 100%;
+    }
+}
