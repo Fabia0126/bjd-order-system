@@ -1,7 +1,19 @@
 // Supabase配置
 const SUPABASE_URL = 'https://assqothmzcsusnksdnmm.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFzc3FvdGhtemNzdXNua3Nkbm1tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzMzMwODEsImV4cCI6MjA5MzkwOTA4MX0.2OxbVdQQBANlv5_vmxitzR5CG79FrD3VPSFzX9laF9M';
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let supabaseClient = null;
+try {
+    if (typeof supabase !== 'undefined' && supabase.createClient) {
+        supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    } else if (typeof window.supabase !== 'undefined') {
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    } else {
+        alert('Supabase库未加载！请刷新页面');
+    }
+} catch (e) {
+    alert('Supabase初始化失败: ' + e.message);
+}
 
 // 订单状态
 const STATUS = {
@@ -29,7 +41,7 @@ let allOrders = [];
 // 获取订单
 async function fetchOrders() {
     try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('orders')
             .select('*')
             .order('submit_time', { ascending: false });
@@ -46,7 +58,7 @@ async function fetchOrders() {
 // 获取设置
 async function fetchSettings() {
     try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('settings')
             .select('*')
             .eq('id', 1)
@@ -234,7 +246,7 @@ async function updateOrderStatus(id, newStatus) {
             updateData.order_id = generateOrderId();
         }
 
-        const { error } = await supabase
+        const { error } = await supabaseClient
             .from('orders')
             .update(updateData)
             .eq('id', id);
@@ -295,7 +307,7 @@ async function saveSettings() {
     };
 
     try {
-        const { error } = await supabase
+        const { error } = await supabaseClient
             .from('settings')
             .update(settings)
             .eq('id', 1);
