@@ -368,8 +368,21 @@ document.querySelectorAll('.tab').forEach(tab => {
 });
 
 // 初始化
-document.addEventListener('DOMContentLoaded', () => {
-    fetchOrders();
-    // 每10秒刷新一次
-    setInterval(fetchOrders, 10000);
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        console.log('开始加载...');
+        await fetchOrders();
+        console.log('加载完成，订单数:', allOrders.length);
+        // 每10秒刷新一次
+        setInterval(fetchOrders, 10000);
+    } catch (error) {
+        console.error('初始化失败:', error);
+        alert('加载失败: ' + error.message);
+    }
 });
+
+// 全局错误捕获
+window.onerror = function(msg, url, line, col, error) {
+    alert('JS错误: ' + msg + '\n行号: ' + line);
+    return false;
+};
