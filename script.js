@@ -1,6 +1,6 @@
 // Supabase配置
 const SUPABASE_URL = 'https://assqothmzcsusnksdnmm.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_2AIuIZyBxU_Mk26yT0GR8w_uxzX4eXZ';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFzc3FvdGhtemNzdXNua3Nkbm1tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzMzMwODEsImV4cCI6MjA5MzkwOTA4MX0.2OxbVdQQBANlv5_vmxitzR5CG79FrD3VPSFzX9laF9M';
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // 价格配置
