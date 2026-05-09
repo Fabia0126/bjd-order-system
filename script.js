@@ -1,7 +1,9 @@
 // Supabase配置
 const SUPABASE_URL = 'https://assqothmzcsusnksdnmm.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFzc3FvdGhtemNzdXNua3Nkbm1tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzMzMwODEsImV4cCI6MjA5MzkwOTA4MX0.2OxbVdQQBANlv5_vmxitzR5CG79FrD3VPSFzX9laF9M';
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabaseClient = (typeof supabase !== 'undefined' && supabase.createClient)
+    ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    : window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // 价格配置
 const PRICES = {
@@ -60,7 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // 检查普单开放状态
 async function checkNormalStatus() {
     try {
-        const { data: settings, error } = await supabase
+        const { data: settings, error } = await supabaseClient
             .from('settings')
             .select('*')
             .eq('id', 1)
@@ -484,7 +486,7 @@ async function confirmSubmit() {
 
     try {
         // 保存到 Supabase
-        const { data: result, error } = await supabase
+        const { data: result, error } = await supabaseClient
             .from('orders')
             .insert([orderData])
             .select();

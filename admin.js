@@ -263,29 +263,23 @@ async function updateOrderStatus(id, newStatus) {
 
 // 普单设置
 async function openSettings() {
-    try {
-        alert('正在获取设置...');
-        const settings = await fetchSettings();
-        alert('设置获取成功: ' + JSON.stringify(settings));
+    const settings = await fetchSettings();
 
-        document.getElementById('normalOn').classList.toggle('active', settings.normal_open);
-        document.getElementById('normalOff').classList.toggle('active', !settings.normal_open);
-        document.getElementById('normalLimit').value = settings.normal_limit || 0;
+    document.getElementById('normalOn').classList.toggle('active', settings.normal_open);
+    document.getElementById('normalOff').classList.toggle('active', !settings.normal_open);
+    document.getElementById('normalLimit').value = settings.normal_limit || 0;
 
-        if (settings.normal_open_time) {
-            const dt = new Date(settings.normal_open_time);
-            document.getElementById('normalOpenTime').value = dt.toISOString().slice(0, 16);
-        } else {
-            document.getElementById('normalOpenTime').value = '';
-        }
-
-        const normalCount = allOrders.filter(o => o.order_type === '普单' && o.status !== 'rejected').length;
-        document.getElementById('currentNormalCount').textContent = normalCount;
-
-        document.getElementById('settingsModal').classList.add('show');
-    } catch (error) {
-        alert('openSettings错误: ' + error.message);
+    if (settings.normal_open_time) {
+        const dt = new Date(settings.normal_open_time);
+        document.getElementById('normalOpenTime').value = dt.toISOString().slice(0, 16);
+    } else {
+        document.getElementById('normalOpenTime').value = '';
     }
+
+    const normalCount = allOrders.filter(o => o.order_type === '普单' && o.status !== 'rejected').length;
+    document.getElementById('currentNormalCount').textContent = normalCount;
+
+    document.getElementById('settingsModal').classList.add('show');
 }
 
 function closeSettings() {
@@ -386,21 +380,7 @@ document.querySelectorAll('.tab').forEach(tab => {
 });
 
 // 初始化
-document.addEventListener('DOMContentLoaded', async () => {
-    try {
-        console.log('开始加载...');
-        await fetchOrders();
-        console.log('加载完成，订单数:', allOrders.length);
-        // 每10秒刷新一次
-        setInterval(fetchOrders, 10000);
-    } catch (error) {
-        console.error('初始化失败:', error);
-        alert('加载失败: ' + error.message);
-    }
+document.addEventListener('DOMContentLoaded', () => {
+    fetchOrders();
+    setInterval(fetchOrders, 10000);
 });
-
-// 全局错误捕获
-window.onerror = function(msg, url, line, col, error) {
-    alert('JS错误: ' + msg + '\n行号: ' + line);
-    return false;
-};
