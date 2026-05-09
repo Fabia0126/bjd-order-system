@@ -251,23 +251,29 @@ async function updateOrderStatus(id, newStatus) {
 
 // 普单设置
 async function openSettings() {
-    const settings = await fetchSettings();
+    try {
+        alert('正在获取设置...');
+        const settings = await fetchSettings();
+        alert('设置获取成功: ' + JSON.stringify(settings));
 
-    document.getElementById('normalOn').classList.toggle('active', settings.normal_open);
-    document.getElementById('normalOff').classList.toggle('active', !settings.normal_open);
-    document.getElementById('normalLimit').value = settings.normal_limit || 0;
+        document.getElementById('normalOn').classList.toggle('active', settings.normal_open);
+        document.getElementById('normalOff').classList.toggle('active', !settings.normal_open);
+        document.getElementById('normalLimit').value = settings.normal_limit || 0;
 
-    if (settings.normal_open_time) {
-        const dt = new Date(settings.normal_open_time);
-        document.getElementById('normalOpenTime').value = dt.toISOString().slice(0, 16);
-    } else {
-        document.getElementById('normalOpenTime').value = '';
+        if (settings.normal_open_time) {
+            const dt = new Date(settings.normal_open_time);
+            document.getElementById('normalOpenTime').value = dt.toISOString().slice(0, 16);
+        } else {
+            document.getElementById('normalOpenTime').value = '';
+        }
+
+        const normalCount = allOrders.filter(o => o.order_type === '普单' && o.status !== 'rejected').length;
+        document.getElementById('currentNormalCount').textContent = normalCount;
+
+        document.getElementById('settingsModal').classList.add('show');
+    } catch (error) {
+        alert('openSettings错误: ' + error.message);
     }
-
-    const normalCount = allOrders.filter(o => o.order_type === '普单' && o.status !== 'rejected').length;
-    document.getElementById('currentNormalCount').textContent = normalCount;
-
-    document.getElementById('settingsModal').classList.add('show');
 }
 
 function closeSettings() {
