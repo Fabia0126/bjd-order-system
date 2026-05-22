@@ -293,10 +293,11 @@ function setNormalStatus(isOpen) {
 }
 
 async function saveSettings() {
+    const timeVal = document.getElementById('normalOpenTime').value;
     const settings = {
         normal_open: document.getElementById('normalOn').classList.contains('active'),
         normal_limit: parseInt(document.getElementById('normalLimit').value) || 0,
-        normal_open_time: document.getElementById('normalOpenTime').value || null,
+        normal_open_time: timeVal ? new Date(timeVal).toISOString() : null,
         updated_at: new Date().toISOString()
     };
 
