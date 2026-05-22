@@ -136,18 +136,18 @@
 
                 <!-- 禁忌 - 仅指定/cos可填 -->
                 <div class="form-group conditional-field" id="tabooSection">
-                    <label>禁忌（最多3条）</label>
-                    <input type="text" name="taboo1" placeholder="禁忌1">
-                    <input type="text" name="taboo2" placeholder="禁忌2">
-                    <input type="text" name="taboo3" placeholder="禁忌3">
+                    <label>禁忌（最多3条，每条10字以内）</label>
+                    <input type="text" name="taboo1" placeholder="禁忌1" maxlength="10">
+                    <input type="text" name="taboo2" placeholder="禁忌2" maxlength="10">
+                    <input type="text" name="taboo3" placeholder="禁忌3" maxlength="10">
                 </div>
 
                 <!-- 要求 - 仅指定/cos可填 -->
                 <div class="form-group conditional-field" id="requirementSection">
-                    <label>要求（最多3条）</label>
-                    <input type="text" name="requirement1" placeholder="要求1">
-                    <input type="text" name="requirement2" placeholder="要求2">
-                    <input type="text" name="requirement3" placeholder="要求3">
+                    <label>要求（最多3条，每条10字以内）</label>
+                    <input type="text" name="requirement1" placeholder="要求1" maxlength="10">
+                    <input type="text" name="requirement2" placeholder="要求2" maxlength="10">
+                    <input type="text" name="requirement3" placeholder="要求3" maxlength="10">
                 </div>
 
                 <!-- 参考图 - 仅指定/cos可上传 -->
@@ -299,6 +299,9 @@
                 <div class="price-final">
                     预估总价：<span id="totalPriceFinal">¥0</span>
                     <p class="price-note">*面纹价格待店主确认后更新</p>
+                </div>
+                <div class="countdown-display" id="countdownDisplay" style="display:none;">
+                    <span id="countdownText"></span>
                 </div>
                 <button type="submit" class="submit-btn" id="submitBtn" disabled>提交小纸条</button>
             </div>

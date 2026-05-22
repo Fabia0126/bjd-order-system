@@ -59,6 +59,11 @@ document.addEventListener('DOMContentLoaded', () => {
     setInterval(checkNormalStatus, 5000); // 每5秒检查一次
 });
 
+// 倒计时相关
+let countdownInterval = null;
+let normalOpenTime = null;
+let isNormalOpen = true;
+
 // 检查普单开放状态
 async function checkNormalStatus() {
     try {
@@ -70,50 +75,115 @@ async function checkNormalStatus() {
 
         if (error) throw error;
 
-        const normalRadio = document.querySelector('input[name="orderType"][value="normal"]');
-        const chaoRadio = document.querySelector('input[name="orderType"][value="chao"]');
         const statusText = document.getElementById('normalStatus');
+        const countdownDisplay = document.getElementById('countdownDisplay');
+        const countdownText = document.getElementById('countdownText');
 
         if (!settings.normal_open) {
-            // 普单关闭
-            normalRadio.disabled = true;
-            normalRadio.parentElement.querySelector('.card-content').style.opacity = '0.5';
+            isNormalOpen = false;
 
-            // 如果当前选的是普单，自动切换到钞单
-            if (normalRadio.checked) {
-                chaoRadio.checked = true;
-                updatePrice();
-            }
+            if (settings.normal_open_time) {
+                normalOpenTime = new Date(settings.normal_open_time);
 
-            // 显示提示
-            if (statusText) {
-                if (settings.normal_open_time) {
-                    const openTime = new Date(settings.normal_open_time);
-                    statusText.textContent = `普单未开放，下次开放时间：${openTime.toLocaleString('zh-CN')}`;
-                } else {
-                    statusText.textContent = '普单已满，当前仅接受钞能力单';
+                if (statusText) {
+                    statusText.textContent = `普单将于 ${normalOpenTime.toLocaleString('zh-CN')} 开放，可提前填写信息`;
+                    statusText.classList.add('show');
                 }
-                statusText.classList.add('show');
+
+                // 启动倒计时
+                if (!countdownInterval) {
+                    updateCountdown();
+                    countdownInterval = setInterval(updateCountdown, 1000);
+                }
+            } else {
+                if (statusText) {
+                    statusText.textContent = '普单已满，当前仅接受钞能力单';
+                    statusText.classList.add('show');
+                }
+                if (countdownDisplay) {
+                    countdownDisplay.style.display = 'none';
+                }
             }
+
+            // 更新提交按钮状态
+            updateSubmitButton();
         } else {
-            // 普单开放
-            normalRadio.disabled = false;
-            normalRadio.parentElement.querySelector('.card-content').style.opacity = '1';
+            isNormalOpen = true;
+            normalOpenTime = null;
+
             if (statusText) {
                 statusText.classList.remove('show');
             }
+
+            if (countdownDisplay) {
+                countdownDisplay.style.display = 'none';
+            }
+
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+                countdownInterval = null;
+            }
+
+            updateSubmitButton();
         }
     } catch (error) {
         console.log('获取设置失败，使用默认状态');
     }
 }
 
-function setupEventListeners() {
-    // 订单类别变化
-    document.querySelectorAll('input[name="orderType"]').forEach(radio => {
-        radio.addEventListener('change', updatePrice);
-    });
+function updateCountdown() {
+    const countdownDisplay = document.getElementById('countdownDisplay');
+    const countdownText = document.getElementById('countdownText');
+    const selectedType = document.querySelector('input[name="orderType"]:checked').value;
 
+    if (!normalOpenTime || selectedType !== 'normal') {
+        if (countdownDisplay) countdownDisplay.style.display = 'none';
+        return;
+    }
+
+    const now = new Date();
+    const diff = normalOpenTime - now;
+
+    if (diff <= 0) {
+        // 时间到了
+        isNormalOpen = true;
+        if (countdownDisplay) countdownDisplay.style.display = 'none';
+        if (countdownInterval) {
+            clearInterval(countdownInterval);
+            countdownInterval = null;
+        }
+        updateSubmitButton();
+        return;
+    }
+
+    const hours = Math.floor(diff / 3600000);
+    const minutes = Math.floor((diff % 3600000) / 60000);
+    const seconds = Math.floor((diff % 60000) / 1000);
+
+    if (countdownDisplay) countdownDisplay.style.display = 'block';
+    if (countdownText) {
+        const parts = [];
+        if (hours > 0) parts.push(`${hours}时`);
+        parts.push(`${minutes}分`);
+        parts.push(`${seconds}秒`);
+        countdownText.textContent = `距离开放还有 ${parts.join('')}，可先填写信息`;
+    }
+}
+
+function updateSubmitButton() {
+    const selectedType = document.querySelector('input[name="orderType"]:checked').value;
+    const agreed = agreeNotice.checked;
+
+    if (selectedType === 'normal' && !isNormalOpen) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = '等待开放...';
+    } else {
+        submitBtn.disabled = !agreed;
+        submitBtn.textContent = '提交小纸条';
+    }
+}
+
+function setupEventListeners() {
     // 尺寸变化
     document.querySelectorAll('input[name="size"]').forEach(radio => {
         radio.addEventListener('change', () => {
@@ -149,8 +219,15 @@ function setupEventListeners() {
     koupeiQty.addEventListener('change', updatePrice);
 
     // 同意条款
-    agreeNotice.addEventListener('change', () => {
-        submitBtn.disabled = !agreeNotice.checked;
+    agreeNotice.addEventListener('change', updateSubmitButton);
+
+    // 订单类别变化时更新价格、提交按钮和倒计时
+    document.querySelectorAll('input[name="orderType"]').forEach(radio => {
+        radio.addEventListener('change', () => {
+            updatePrice();
+            updateSubmitButton();
+            updateCountdown();
+        });
     });
 
     // 表单提交
