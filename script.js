@@ -127,7 +127,7 @@ async function checkNormalStatus() {
             updateSubmitButton();
         }
     } catch (error) {
-        console.log('获取设置失败，使用默认状态');
+        // Supabase不可用时静默处理，不影响用户填写
     }
 }
 
