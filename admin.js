@@ -263,6 +263,11 @@ async function updateOrderStatus(id, newStatus) {
 
 // 普单设置
 async function openSettings() {
+    document.getElementById('settingsModal').classList.add('show');
+
+    const normalCount = allOrders.filter(o => o.order_type === '普单' && o.status !== 'rejected').length;
+    document.getElementById('currentNormalCount').textContent = normalCount;
+
     const settings = await fetchSettings();
 
     document.getElementById('normalOn').classList.toggle('active', settings.normal_open);
@@ -275,11 +280,6 @@ async function openSettings() {
     } else {
         document.getElementById('normalOpenTime').value = '';
     }
-
-    const normalCount = allOrders.filter(o => o.order_type === '普单' && o.status !== 'rejected').length;
-    document.getElementById('currentNormalCount').textContent = normalCount;
-
-    document.getElementById('settingsModal').classList.add('show');
 }
 
 function closeSettings() {
