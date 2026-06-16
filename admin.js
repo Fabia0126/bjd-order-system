@@ -183,6 +183,7 @@ function openOrder(id) {
                 <div class="detail-row"><span class="detail-label">色系</span><span class="detail-value">${order.color_scheme}</span></div>
                 ${order.taboos && order.taboos.length > 0 ? `<div class="detail-row"><span class="detail-label">禁忌</span><span class="detail-value">${order.taboos.join('、')}</span></div>` : ''}
                 ${order.requirements && order.requirements.length > 0 ? `<div class="detail-row"><span class="detail-label">要求</span><span class="detail-value">${order.requirements.join('、')}</span></div>` : ''}
+                ${order.reference_images && order.reference_images.length > 0 ? `<div class="detail-row" style="flex-direction:column;align-items:flex-start;"><span class="detail-label" style="margin-bottom:8px;">参考图（${order.reference_images.length}张）</span><div style="display:flex;flex-wrap:wrap;gap:8px;">${order.reference_images.map(url => `<a href="${url}" target="_blank" style="display:block;"><img src="${url}" style="max-width:150px;max-height:150px;border-radius:8px;object-fit:cover;border:1px solid #e8e0eb;"></a>`).join('')}</div></div>` : ''}
             </div>
         </div>
         <div class="detail-section">

@@ -661,6 +661,33 @@ async function confirmSubmit() {
     };
 
     try {
+        const confirmBtn = document.querySelector('.btn-confirm');
+
+        // 上传参考图到Storage
+        const fileInput = document.querySelector('input[name="referenceImages"]');
+        if (fileInput && fileInput.files.length > 0) {
+            if (confirmBtn) confirmBtn.textContent = '正在上传图片...';
+            const imageUrls = [];
+            for (const file of fileInput.files) {
+                const ext = file.name.split('.').pop();
+                const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+                const { error: uploadError } = await supabaseClient.storage
+                    .from('reference-images')
+                    .upload(fileName, file);
+                if (!uploadError) {
+                    const { data: urlData } = supabaseClient.storage
+                        .from('reference-images')
+                        .getPublicUrl(fileName);
+                    imageUrls.push(urlData.publicUrl);
+                }
+            }
+            if (imageUrls.length > 0) {
+                orderData.reference_images = imageUrls;
+            }
+        }
+
+        if (confirmBtn) confirmBtn.textContent = '正在提交...';
+
         // 保存到 Supabase
         const { data: result, error } = await supabaseClient
             .from('orders')
