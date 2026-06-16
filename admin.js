@@ -280,6 +280,8 @@ async function openSettings() {
     } else {
         document.getElementById('normalOpenTime').value = '';
     }
+
+    updateTimerStatus();
 }
 
 function closeSettings() {
@@ -290,6 +292,42 @@ function closeSettings() {
 function setNormalStatus(isOpen) {
     document.getElementById('normalOn').classList.toggle('active', isOpen);
     document.getElementById('normalOff').classList.toggle('active', !isOpen);
+    if (isOpen) {
+        document.getElementById('normalOpenTime').value = '';
+        updateTimerStatus();
+    }
+    saveSettings();
+}
+
+function clearOpenTime() {
+    document.getElementById('normalOpenTime').value = '';
+    updateTimerStatus();
+    saveSettings();
+}
+
+function updateTimerStatus() {
+    const timeVal = document.getElementById('normalOpenTime').value;
+    const statusEl = document.getElementById('timerStatus');
+    const isOpen = document.getElementById('normalOn').classList.contains('active');
+    if (!statusEl) return;
+
+    if (isOpen) {
+        statusEl.textContent = '当前状态：手动开放中';
+        statusEl.style.color = '#28a745';
+    } else if (timeVal) {
+        const dt = new Date(timeVal);
+        const now = new Date();
+        if (dt > now) {
+            statusEl.textContent = '当前状态：已关闭，将于 ' + dt.toLocaleString('zh-CN') + ' 自动开放';
+            statusEl.style.color = '#996600';
+        } else {
+            statusEl.textContent = '定时已过期，请更新时间或手动开放';
+            statusEl.style.color = '#dc3545';
+        }
+    } else {
+        statusEl.textContent = '当前状态：已关闭（纯手动模式）';
+        statusEl.style.color = '#888';
+    }
 }
 
 async function saveSettings() {
@@ -308,6 +346,7 @@ async function saveSettings() {
             .eq('id', 1);
 
         if (error) throw error;
+        updateTimerStatus();
     } catch (error) {
         console.error('保存设置失败:', error);
     }

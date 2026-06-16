@@ -50,13 +50,104 @@ const colorScheme = document.getElementById('colorScheme');
 const addonKoupei = document.getElementById('addonKoupei');
 const koupeiQty = document.getElementById('koupeiQty');
 
+const DRAFT_KEY = 'bjd_order_draft';
+
+function saveDraft() {
+    const data = {};
+    data.orderType = document.querySelector('input[name="orderType"]:checked')?.value;
+    data.size = document.querySelector('input[name="size"]:checked')?.value;
+    data.makeupType = document.querySelector('input[name="makeupType"]:checked')?.value;
+    data.dollInfo = form.querySelector('[name="dollInfo"]').value;
+    data.attribute = form.querySelector('[name="attribute"]').value;
+    data.gender = form.querySelector('[name="gender"]').value;
+    data.colorScheme = form.querySelector('[name="colorScheme"]').value;
+    data.taboo1 = form.querySelector('[name="taboo1"]').value;
+    data.taboo2 = form.querySelector('[name="taboo2"]').value;
+    data.taboo3 = form.querySelector('[name="taboo3"]').value;
+    data.requirement1 = form.querySelector('[name="requirement1"]').value;
+    data.requirement2 = form.querySelector('[name="requirement2"]').value;
+    data.requirement3 = form.querySelector('[name="requirement3"]').value;
+    data.addons = Array.from(form.querySelectorAll('input[name="addon"]:checked')).map(cb => cb.value);
+    data.koupeiQty = form.querySelector('[name="koupeiQty"]').value;
+    data.freeItems = Array.from(form.querySelectorAll('input[name="freeItem"]:checked')).map(cb => cb.value);
+    data.glitter = form.querySelector('[name="glitter"]').value;
+    data.accessories = form.querySelector('[name="accessories"]').value;
+    data.xianyuId = form.querySelector('[name="xianyuId"]').value;
+    data.receiverName = form.querySelector('[name="receiverName"]').value;
+    data.contact1 = form.querySelector('[name="contact1"]').value;
+    data.contact2 = form.querySelector('[name="contact2"]').value;
+    data.shipping = form.querySelector('[name="shipping"]').value;
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(data));
+}
+
+function loadDraft() {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return;
+    try {
+        const data = JSON.parse(raw);
+        if (data.orderType) {
+            const radio = form.querySelector(`input[name="orderType"][value="${data.orderType}"]`);
+            if (radio) radio.checked = true;
+        }
+        if (data.size) {
+            const radio = form.querySelector(`input[name="size"][value="${data.size}"]`);
+            if (radio) radio.checked = true;
+        }
+        if (data.makeupType) {
+            const radio = form.querySelector(`input[name="makeupType"][value="${data.makeupType}"]`);
+            if (radio) radio.checked = true;
+        }
+        const textFields = ['dollInfo', 'taboo1', 'taboo2', 'taboo3', 'requirement1', 'requirement2', 'requirement3', 'accessories', 'xianyuId', 'receiverName', 'contact1', 'contact2', 'shipping'];
+        textFields.forEach(name => {
+            if (data[name]) {
+                const el = form.querySelector(`[name="${name}"]`);
+                if (el) el.value = data[name];
+            }
+        });
+        const selectFields = ['attribute', 'gender', 'colorScheme', 'glitter'];
+        selectFields.forEach(name => {
+            if (data[name]) {
+                const el = form.querySelector(`[name="${name}"]`);
+                if (el) el.value = data[name];
+            }
+        });
+        if (data.addons && data.addons.length > 0) {
+            data.addons.forEach(val => {
+                const cb = form.querySelector(`input[name="addon"][value="${val}"]`);
+                if (cb) {
+                    cb.checked = true;
+                    if (cb.id === 'addonKoupei') {
+                        koupeiQty.disabled = false;
+                    }
+                }
+            });
+        }
+        if (data.koupeiQty) koupeiQty.value = data.koupeiQty;
+        if (data.freeItems && data.freeItems.length > 0) {
+            data.freeItems.forEach(val => {
+                const cb = form.querySelector(`input[name="freeItem"][value="${val}"]`);
+                if (cb) cb.checked = true;
+            });
+        }
+    } catch (e) {}
+}
+
+function clearDraft() {
+    localStorage.removeItem(DRAFT_KEY);
+}
+
 // 初始化
 document.addEventListener('DOMContentLoaded', () => {
+    loadDraft();
     updatePrice();
+    updatePriceLabels();
     updateConditionalFields();
+    updateMakeupHint();
     setupEventListeners();
-    checkNormalStatus(); // 检查普单状态
-    setInterval(checkNormalStatus, 5000); // 每5秒检查一次
+    checkNormalStatus();
+    setInterval(checkNormalStatus, 5000);
+    form.addEventListener('input', saveDraft);
+    form.addEventListener('change', saveDraft);
 });
 
 // 倒计时相关
@@ -574,6 +665,7 @@ async function confirmSubmit() {
         alert('提交成功！\n\n订单已提交，请等待店主审核确认。\n确认后会生成订单编号，届时请凭编号去闲鱼拍万能拍。\n\n您可以在"订单查询"页面用联系方式查看订单状态。');
 
         closePreview();
+        clearDraft();
 
         // 重置表单
         document.getElementById('orderForm').reset();
