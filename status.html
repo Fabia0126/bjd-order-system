@@ -149,6 +149,35 @@
             margin-top: 20px;
             font-size: 14px;
         }
+        .reject-reason-box {
+            background: #fff5f5;
+            border: 1px solid #f0c0c0;
+            border-radius: 10px;
+            padding: 14px 16px;
+            margin-top: 12px;
+        }
+        .reject-reason-box .reason-label {
+            font-size: 13px;
+            color: #999;
+            margin-bottom: 6px;
+        }
+        .reject-reason-box .reason-text {
+            font-size: 14px;
+            color: #721c24;
+            line-height: 1.6;
+        }
+        .resubmit-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #d485a8 0%, #c08db8 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            margin-top: 12px;
+        }
     </style>
 </head>
 <body>
@@ -246,7 +275,13 @@
                             <span class="info-value">${formatTime(order.submit_time)}</span>
                         </div>
                     </div>
-                    ${order.order_id ? `
+                    ${order.status === 'rejected' ? `
+                    <div class="reject-reason-box">
+                        <div class="reason-label">拒绝理由</div>
+                        <div class="reason-text">${order.reject_reason || '未填写理由'}</div>
+                    </div>
+                    <button class="resubmit-btn" onclick="resubmitOrder('${order.id}')">修改并重新投递</button>
+                    ` : order.order_id ? `
                     <div class="receipt-box">
                         <h3>回执小纸条（可复制）</h3>
                         <pre class="receipt-text">${generateReceipt(order)}</pre>
@@ -333,6 +368,44 @@
                 document.body.removeChild(textarea);
                 alert('回执已复制！请去闲鱼拍万能拍时备注订单编号');
             });
+        }
+
+        function resubmitOrder(orderId) {
+            const order = searchResults.find(o => o.id === orderId);
+            if (!order) return;
+
+            const makeupTypeMap = { '全自由妆': 'free', '指定妆': 'specified', 'COS妆': 'cos' };
+            const sizeMap = { '三分': '3fen', '四分': '4fen' };
+            const orderTypeMap = { '普单': 'normal', '钞能力单': 'chao' };
+
+            const draft = {
+                orderType: orderTypeMap[order.order_type] || 'normal',
+                size: sizeMap[order.size] || '3fen',
+                makeupType: makeupTypeMap[order.makeup_type] || 'free',
+                dollInfo: order.doll_info || '',
+                attribute: order.attribute || '',
+                gender: order.gender || '男养',
+                colorScheme: order.color_scheme || '自由发挥',
+                taboo1: (order.taboos && order.taboos[0]) || '',
+                taboo2: (order.taboos && order.taboos[1]) || '',
+                taboo3: (order.taboos && order.taboos[2]) || '',
+                requirement1: (order.requirements && order.requirements[0]) || '',
+                requirement2: (order.requirements && order.requirements[1]) || '',
+                requirement3: (order.requirements && order.requirements[2]) || '',
+                addons: order.addons || [],
+                koupeiQty: '1',
+                freeItems: order.free_items || [],
+                glitter: order.glitter || '否',
+                accessories: order.accessories || '',
+                xianyuId: order.xianyu_id || '',
+                receiverName: order.receiver_name || '',
+                contact1: order.contact1 || '',
+                contact2: order.contact2 || '',
+                shipping: order.shipping || '顺丰到付'
+            };
+
+            localStorage.setItem('bjd_order_draft', JSON.stringify(draft));
+            window.location.href = 'form.html?resubmit=1';
         }
 
         // 支持回车查询

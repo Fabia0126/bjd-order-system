@@ -215,7 +215,7 @@ function openOrder(id) {
     if (order.status === 'pending') {
         actions.innerHTML = `
             <button class="btn-approve" onclick="updateOrderStatus('${order.id}', 'approved')">✓ 通过并生成编号</button>
-            <button class="btn-reject" onclick="updateOrderStatus('${order.id}', 'rejected')">✗ 拒绝</button>
+            <button class="btn-reject" onclick="showRejectDialog('${order.id}')">✗ 拒绝</button>
         `;
     } else if (nextStatuses.length > 0) {
         actions.innerHTML = nextStatuses.map(status => `
@@ -233,17 +233,48 @@ function closeModal() {
     document.getElementById('orderModal').classList.remove('show');
 }
 
+function showRejectDialog(id) {
+    const existingDialog = document.querySelector('.reject-dialog-overlay');
+    if (existingDialog) existingDialog.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'reject-dialog-overlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px;';
+    overlay.innerHTML = `
+        <div style="background:white;border-radius:16px;padding:24px;max-width:400px;width:100%;">
+            <h3 style="color:#d485a8;margin-bottom:16px;">拒绝理由</h3>
+            <textarea id="rejectReasonInput" placeholder="请填写拒绝理由，客户查询时可以看到" style="width:100%;min-height:100px;padding:12px;border:1.5px solid #e8e0eb;border-radius:10px;font-size:14px;resize:vertical;box-sizing:border-box;"></textarea>
+            <div style="display:flex;gap:10px;margin-top:16px;">
+                <button onclick="confirmReject('${id}')" style="flex:1;padding:12px;background:linear-gradient(135deg,#dc3545,#c82333);color:white;border:none;border-radius:10px;font-size:15px;cursor:pointer;">确认拒绝</button>
+                <button onclick="this.closest('.reject-dialog-overlay').remove()" style="flex:1;padding:12px;background:#f0f0f0;color:#666;border:none;border-radius:10px;font-size:15px;cursor:pointer;">取消</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    document.getElementById('rejectReasonInput').focus();
+}
+
+async function confirmReject(id) {
+    const reason = document.getElementById('rejectReasonInput').value.trim();
+    const overlay = document.querySelector('.reject-dialog-overlay');
+    if (overlay) overlay.remove();
+    await updateOrderStatus(id, 'rejected', reason);
+}
+
 // 更新订单状态
-async function updateOrderStatus(id, newStatus) {
+async function updateOrderStatus(id, newStatus, rejectReason) {
     try {
         const updateData = {
             status: newStatus,
             last_update: new Date().toISOString()
         };
 
-        // 如果是审核通过，生成订单编号
         if (newStatus === 'approved') {
             updateData.order_id = generateOrderId();
+        }
+
+        if (newStatus === 'rejected' && rejectReason) {
+            updateData.reject_reason = rejectReason;
         }
 
         const { error } = await supabaseClient

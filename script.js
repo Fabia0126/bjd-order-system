@@ -148,6 +148,14 @@ document.addEventListener('DOMContentLoaded', () => {
     setInterval(checkNormalStatus, 5000);
     form.addEventListener('input', saveDraft);
     form.addEventListener('change', saveDraft);
+
+    if (new URLSearchParams(window.location.search).get('resubmit') === '1') {
+        const banner = document.createElement('div');
+        banner.style.cssText = 'background:#fff5f5;border:1px solid #f0c0c0;border-radius:12px;padding:14px 18px;margin-bottom:16px;text-align:center;color:#721c24;font-size:14px;';
+        banner.textContent = '这是被拒绝订单的重新投递，已自动填入之前的信息，请修改后重新提交';
+        form.parentElement.insertBefore(banner, form.querySelector('header')?.nextSibling || form.firstChild);
+        window.history.replaceState({}, '', 'form.html');
+    }
 });
 
 // 倒计时相关
