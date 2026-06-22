@@ -148,7 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateMakeupHint();
     setupEventListeners();
     checkNormalStatus();
-    setInterval(checkNormalStatus, 5000);
+    startSmartPolling();
     form.addEventListener('input', saveDraft);
     form.addEventListener('change', saveDraft);
 
@@ -160,6 +160,29 @@ document.addEventListener('DOMContentLoaded', () => {
         window.history.replaceState({}, '', 'form.html');
     }
 });
+
+// 轮询相关
+let pollTimer = null;
+
+function startSmartPolling() {
+    if (pollTimer) clearTimeout(pollTimer);
+    const delay = getPollingDelay();
+    pollTimer = setTimeout(async () => {
+        await checkNormalStatus();
+        startSmartPolling();
+    }, delay);
+}
+
+function getPollingDelay() {
+    // 已抢完：60秒
+    if (isNormalOpen && normalLimit > 0 && normalRemaining <= 0) return 60000;
+    // 已开放且有库存：2秒（实时看名额变化）
+    if (isNormalOpen && normalLimit > 0) return 2000;
+    // 已开放无限量：10秒
+    if (isNormalOpen) return 10000;
+    // 未开放：30秒
+    return 30000;
+}
 
 // 倒计时相关
 let countdownInterval = null;
