@@ -344,30 +344,40 @@
         let searchResults = [];
 
         async function copyReceipt(orderId) {
-            const order = searchResults.find(o => o.id === orderId);
+            let order = searchResults.find(o => o.id === orderId);
             if (!order) {
-                // 从数据库重新获取
-                const { data, error } = await supabaseClient
-                    .from('orders')
-                    .select('*')
-                    .eq('id', orderId)
-                    .single();
-                if (error || !data) return;
-                order = data;
+                try {
+                    const { data, error } = await supabaseClient
+                        .from('orders')
+                        .select('*')
+                        .eq('id', orderId)
+                        .single();
+                    if (error || !data) {
+                        alert('找不到订单数据，请重新查询');
+                        return;
+                    }
+                    order = data;
+                } catch (e) {
+                    alert('获取订单失败，请重新查询');
+                    return;
+                }
             }
 
             const text = generateReceipt(order);
-            navigator.clipboard.writeText(text).then(() => {
+            try {
+                await navigator.clipboard.writeText(text);
                 alert('回执已复制！请去闲鱼拍万能拍时备注订单编号');
-            }).catch(() => {
+            } catch (e) {
                 const textarea = document.createElement('textarea');
                 textarea.value = text;
+                textarea.style.position = 'fixed';
+                textarea.style.opacity = '0';
                 document.body.appendChild(textarea);
                 textarea.select();
                 document.execCommand('copy');
                 document.body.removeChild(textarea);
                 alert('回执已复制！请去闲鱼拍万能拍时备注订单编号');
-            });
+            }
         }
 
         function resubmitOrder(orderId) {

@@ -37,6 +37,8 @@ const STATUS_FLOW = {
 
 let currentFilter = 'all';
 let allOrders = [];
+let lastFetchOk = true;
+let consecutiveFetchFails = 0;
 
 // 获取订单
 async function fetchOrders() {
@@ -50,8 +52,65 @@ async function fetchOrders() {
         allOrders = data || [];
         renderOrders(currentFilter);
         updateStats();
+        consecutiveFetchFails = 0;
+        if (!lastFetchOk) {
+            lastFetchOk = true;
+            hideNetworkBanner();
+        }
+        updateLastSyncTime();
     } catch (error) {
         console.error('获取订单失败:', error);
+        consecutiveFetchFails++;
+        if (consecutiveFetchFails >= 2) {
+            lastFetchOk = false;
+            showNetworkBanner('数据同步失败，显示的可能不是最新状态');
+        }
+    }
+}
+
+function showNetworkBanner(msg) {
+    let banner = document.getElementById('networkBanner');
+    if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'networkBanner';
+        banner.style.cssText = 'background:#fff3cd;border:1px solid #ffc107;border-radius:10px;padding:10px 16px;margin-bottom:12px;text-align:center;color:#856404;font-size:13px;display:flex;align-items:center;justify-content:center;gap:8px;';
+        const container = document.querySelector('.container');
+        const header = container.querySelector('header');
+        header.after(banner);
+    }
+    banner.innerHTML = `⚠️ ${msg} <button onclick="manualRefresh()" style="padding:4px 12px;border:1px solid #856404;border-radius:6px;background:white;color:#856404;cursor:pointer;font-size:12px;">重新加载</button>`;
+    banner.style.display = 'flex';
+}
+
+function hideNetworkBanner() {
+    const banner = document.getElementById('networkBanner');
+    if (banner) banner.style.display = 'none';
+}
+
+function updateLastSyncTime() {
+    let el = document.getElementById('lastSyncTime');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'lastSyncTime';
+        el.style.cssText = 'text-align:center;color:#aaa;font-size:11px;margin-top:8px;';
+        document.getElementById('orderList').after(el);
+    }
+    const now = new Date();
+    el.textContent = `最后同步: ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
+}
+
+async function manualRefresh() {
+    const bannerBtn = document.querySelector('#networkBanner button');
+    if (bannerBtn) bannerBtn.textContent = '加载中...';
+    const refreshBtn = document.querySelector('.btn-refresh');
+    if (refreshBtn) {
+        refreshBtn.disabled = true;
+        refreshBtn.style.opacity = '0.5';
+    }
+    await fetchOrders();
+    if (refreshBtn) {
+        refreshBtn.disabled = false;
+        refreshBtn.style.opacity = '1';
     }
 }
 
@@ -119,7 +178,7 @@ function renderOrders(filter = 'all') {
                 <span>🎭 ${order.makeup_type}</span>
                 <span>📏 ${order.size}</span>
                 <span>🎪 ${(order.doll_info || '').substring(0, 15)}${(order.doll_info || '').length > 15 ? '...' : ''}</span>
-                <span>👤 ${order.receiver_name}</span>
+                <span>👤 ${order.xianyu_id || order.receiver_name}</span>
             </div>
             <div class="order-price">
                 <span class="price-value">${order.total_price}</span>
@@ -264,6 +323,15 @@ async function confirmReject(id) {
 
 // 更新订单状态
 async function updateOrderStatus(id, newStatus, rejectReason) {
+    const actionBtns = document.querySelectorAll('#orderActions button');
+    actionBtns.forEach(btn => {
+        btn.disabled = true;
+        btn.style.opacity = '0.6';
+    });
+    const activeBtn = event?.target;
+    const originalText = activeBtn?.textContent;
+    if (activeBtn) activeBtn.textContent = '处理中...';
+
     try {
         const updateData = {
             status: newStatus,
@@ -278,10 +346,16 @@ async function updateOrderStatus(id, newStatus, rejectReason) {
             updateData.reject_reason = rejectReason;
         }
 
-        const { error } = await supabaseClient
+        const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('操作超时，请检查网络后重试')), 15000)
+        );
+
+        const updatePromise = supabaseClient
             .from('orders')
             .update(updateData)
             .eq('id', id);
+
+        const { error } = await Promise.race([updatePromise, timeoutPromise]);
 
         if (error) throw error;
 
@@ -289,7 +363,12 @@ async function updateOrderStatus(id, newStatus, rejectReason) {
         await fetchOrders();
     } catch (error) {
         console.error('更新失败:', error);
-        alert('更新失败: ' + error.message);
+        alert('更新失败: ' + (error.message || '未知错误'));
+        actionBtns.forEach(btn => {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+        });
+        if (activeBtn) activeBtn.textContent = originalText;
     }
 }
 

@@ -628,7 +628,6 @@ function copyText() {
 }
 
 async function confirmSubmit() {
-    // 获取当前订单数据
     const data = window.currentOrderData;
     if (!data) {
         alert('数据错误，请重新填写');
@@ -636,7 +635,14 @@ async function confirmSubmit() {
         return;
     }
 
-    // 准备数据库数据
+    const confirmBtn = document.querySelector('.btn-confirm');
+    const cancelBtn = document.querySelector('.btn-cancel');
+    if (confirmBtn) {
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = '正在提交...';
+    }
+    if (cancelBtn) cancelBtn.disabled = true;
+
     const orderData = {
         status: 'pending',
         order_type: data.orderType,
@@ -661,9 +667,6 @@ async function confirmSubmit() {
     };
 
     try {
-        const confirmBtn = document.querySelector('.btn-confirm');
-
-        // 上传参考图到Storage
         const fileInput = document.querySelector('input[name="referenceImages"]');
         if (fileInput && fileInput.files.length > 0) {
             if (confirmBtn) confirmBtn.textContent = '正在上传图片...';
@@ -688,28 +691,40 @@ async function confirmSubmit() {
 
         if (confirmBtn) confirmBtn.textContent = '正在提交...';
 
-        // 保存到 Supabase
-        const { data: result, error } = await supabaseClient
+        const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('提交超时，请检查网络后重试')), 20000)
+        );
+
+        const insertPromise = supabaseClient
             .from('orders')
             .insert([orderData])
             .select();
 
+        const { data: result, error } = await Promise.race([insertPromise, timeoutPromise]);
+
         if (error) throw error;
 
-        // 显示成功提示
+        if (!result || result.length === 0) {
+            throw new Error('服务器未返回确认数据，订单可能未成功提交，请刷新后检查');
+        }
+
         alert('提交成功！\n\n订单已提交，请等待店主审核确认。\n确认后会生成订单编号，届时请凭编号去闲鱼拍万能拍。\n\n您可以在"订单查询"页面用联系方式查看订单状态。');
 
         closePreview();
         clearDraft();
 
-        // 重置表单
         document.getElementById('orderForm').reset();
         document.getElementById('agreeNotice').checked = false;
         document.getElementById('submitBtn').disabled = true;
         updatePrice();
     } catch (error) {
         console.error('提交失败:', error);
-        alert('提交失败，请稍后重试\n\n错误信息: ' + error.message);
+        alert('提交失败，请稍后重试\n\n错误信息: ' + (error.message || '网络错误'));
+        if (confirmBtn) {
+            confirmBtn.disabled = false;
+            confirmBtn.textContent = '确认提交';
+        }
+        if (cancelBtn) cancelBtn.disabled = false;
     }
 }
 
