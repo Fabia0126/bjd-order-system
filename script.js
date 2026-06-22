@@ -165,6 +165,8 @@ document.addEventListener('DOMContentLoaded', () => {
 let countdownInterval = null;
 let normalOpenTime = null;
 let isNormalOpen = true;
+let normalLimit = 0;
+let normalRemaining = -1;
 
 // 检查普单开放状态
 async function checkNormalStatus() {
@@ -181,6 +183,18 @@ async function checkNormalStatus() {
         const countdownDisplay = document.getElementById('countdownDisplay');
         const countdownText = document.getElementById('countdownText');
 
+        normalLimit = settings.normal_limit || 0;
+
+        // 查剩余名额
+        if (normalLimit > 0) {
+            const { count } = await supabaseClient
+                .from('orders')
+                .select('*', { count: 'exact', head: true })
+                .eq('order_type', '普单')
+                .neq('status', 'rejected');
+            normalRemaining = normalLimit - (count || 0);
+        }
+
         if (!settings.normal_open) {
             isNormalOpen = false;
 
@@ -188,11 +202,11 @@ async function checkNormalStatus() {
                 normalOpenTime = new Date(settings.normal_open_time);
 
                 if (statusText) {
-                    statusText.textContent = `普单将于 ${normalOpenTime.toLocaleString('zh-CN')} 开放，可提前填写信息`;
+                    const limitText = normalLimit > 0 ? `（限${normalLimit}单）` : '';
+                    statusText.textContent = `普单将于 ${normalOpenTime.toLocaleString('zh-CN')} 开放${limitText}，可提前填写信息`;
                     statusText.classList.add('show');
                 }
 
-                // 启动倒计时
                 if (!countdownInterval) {
                     updateCountdown();
                     countdownInterval = setInterval(updateCountdown, 1000);
@@ -207,14 +221,27 @@ async function checkNormalStatus() {
                 }
             }
 
-            // 更新提交按钮状态
             updateSubmitButton();
         } else {
             isNormalOpen = true;
             normalOpenTime = null;
 
-            if (statusText) {
-                statusText.classList.remove('show');
+            if (normalLimit > 0 && normalRemaining <= 0) {
+                if (statusText) {
+                    statusText.textContent = '普单已抢完，当前仅接受钞能力单';
+                    statusText.classList.add('show');
+                }
+                updateSubmitButton();
+            } else {
+                if (statusText) {
+                    if (normalLimit > 0 && normalRemaining > 0) {
+                        statusText.textContent = `普单剩余 ${normalRemaining} 个名额`;
+                        statusText.classList.add('show');
+                    } else {
+                        statusText.classList.remove('show');
+                    }
+                }
+                updateSubmitButton();
             }
 
             if (countdownDisplay) {
@@ -225,8 +252,6 @@ async function checkNormalStatus() {
                 clearInterval(countdownInterval);
                 countdownInterval = null;
             }
-
-            updateSubmitButton();
         }
     } catch (error) {
         // Supabase不可用时静默处理，不影响用户填写
@@ -279,6 +304,9 @@ function updateSubmitButton() {
     if (selectedType === 'normal' && !isNormalOpen) {
         submitBtn.disabled = true;
         submitBtn.textContent = '等待开放...';
+    } else if (selectedType === 'normal' && normalLimit > 0 && normalRemaining <= 0) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = '普单已抢完';
     } else {
         submitBtn.disabled = !agreed;
         submitBtn.textContent = '提交小纸条';
@@ -704,9 +732,36 @@ async function confirmSubmit() {
     const cancelBtn = document.querySelector('.btn-cancel');
     if (confirmBtn) {
         confirmBtn.disabled = true;
-        confirmBtn.textContent = '正在提交...';
+        confirmBtn.textContent = '排队中...';
     }
     if (cancelBtn) cancelBtn.disabled = true;
+
+    // 随机延迟0-2秒，把并发请求打散
+    await new Promise(r => setTimeout(r, Math.random() * 2000));
+
+    if (confirmBtn) confirmBtn.textContent = '正在提交...';
+
+    // 普单提交前快速检查库存
+    if (data.orderType === '普单' && normalLimit > 0) {
+        try {
+            const { count } = await supabaseClient
+                .from('orders')
+                .select('*', { count: 'exact', head: true })
+                .eq('order_type', '普单')
+                .neq('status', 'rejected');
+            if (count >= normalLimit) {
+                alert('很抱歉，普单已被抢完啦！');
+                if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = '确认提交'; }
+                if (cancelBtn) cancelBtn.disabled = false;
+                normalRemaining = 0;
+                updateSubmitButton();
+                closePreview();
+                return;
+            }
+        } catch (e) {
+            // 检查失败不阻塞，靠数据库trigger兜底
+        }
+    }
 
     const orderData = {
         status: 'pending',
@@ -810,12 +865,20 @@ async function confirmSubmit() {
         updatePrice();
     } catch (error) {
         console.error('提交失败:', error);
-        alert('提交失败，请稍后重试\n\n错误信息: ' + (error.message || '网络错误'));
-        if (confirmBtn) {
-            confirmBtn.disabled = false;
-            confirmBtn.textContent = '确认提交';
+        const errMsg = error.message || '';
+        if (errMsg.includes('NORMAL_ORDER_FULL') || errMsg.includes('普单已抢完')) {
+            alert('很抱歉，普单已被抢完啦！');
+            normalRemaining = 0;
+            updateSubmitButton();
+            closePreview();
+        } else {
+            alert('提交失败，请稍后重试\n\n错误信息: ' + (errMsg || '网络错误'));
+            if (confirmBtn) {
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = '确认提交';
+            }
+            if (cancelBtn) cancelBtn.disabled = false;
         }
-        if (cancelBtn) cancelBtn.disabled = false;
     }
 }
 
