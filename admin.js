@@ -182,6 +182,10 @@ function renderOrders(filter = 'all') {
             </div>
             <div class="order-price">
                 <span class="price-value">${order.total_price}</span>
+                <div class="payment-tags">
+                    <span class="pay-tag ${order.deposit_paid ? 'paid' : 'unpaid'}" onclick="event.stopPropagation();togglePayment('${order.id}','deposit_paid',${!order.deposit_paid})">${order.deposit_paid ? '定金已付' : '定金未付'}</span>
+                    <span class="pay-tag ${order.final_paid ? 'paid' : 'unpaid'}" onclick="event.stopPropagation();togglePayment('${order.id}','final_paid',${!order.final_paid})">${order.final_paid ? '尾款已付' : '尾款未付'}</span>
+                </div>
                 <span class="order-time">${formatTime(order.submit_time)}</span>
             </div>
         </div>
@@ -518,6 +522,22 @@ function exportOrders() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+}
+
+// 切换付款状态
+async function togglePayment(id, field, value) {
+    try {
+        const { error } = await supabaseClient
+            .from('orders')
+            .update({ [field]: value })
+            .eq('id', id);
+        if (error) throw error;
+        const order = allOrders.find(o => o.id === id);
+        if (order) order[field] = value;
+        renderOrders(currentFilter);
+    } catch (error) {
+        alert('更新失败: ' + (error.message || '未知错误'));
+    }
 }
 
 // 筛选标签

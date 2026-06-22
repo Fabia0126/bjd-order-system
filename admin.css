@@ -217,6 +217,37 @@ header h1 {
     color: #999;
 }
 
+.payment-tags {
+    display: flex;
+    gap: 6px;
+}
+
+.pay-tag {
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.2s;
+}
+
+.pay-tag.unpaid {
+    background: #fff0f0;
+    color: #dc3545;
+    border: 1px solid #f5c6cb;
+}
+
+.pay-tag.paid {
+    background: #e8f5e9;
+    color: #28a745;
+    border: 1px solid #c3e6cb;
+}
+
+.pay-tag:active {
+    transform: scale(0.95);
+}
+
 /* Modal */
 .modal {
     display: none;
