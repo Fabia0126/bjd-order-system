@@ -174,14 +174,15 @@ function startSmartPolling() {
 }
 
 function getPollingDelay() {
-    // 已抢完：60秒
-    if (isNormalOpen && normalLimit > 0 && normalRemaining <= 0) return 60000;
-    // 已开放且有库存：2秒（实时看名额变化）
-    if (isNormalOpen && normalLimit > 0) return 2000;
-    // 已开放无限量：10秒
-    if (isNormalOpen) return 10000;
-    // 未开放：30秒
-    return 30000;
+    // 倒计时最后10秒：1秒（快速同步开放状态）
+    if (!isNormalOpen && normalOpenTime) {
+        const diff = normalOpenTime - new Date();
+        if (diff > 0 && diff <= 10000) return 1000;
+    }
+    // 刚开放后的头10秒：2秒
+    if (isNormalOpen && normalLimit > 0 && normalRemaining > 0 && normalRemaining < normalLimit) return 2000;
+    // 其他时候：10秒（用户会自己刷新）
+    return 10000;
 }
 
 // 倒计时相关
