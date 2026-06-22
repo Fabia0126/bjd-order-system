@@ -167,7 +167,7 @@ function renderOrders(filter = 'all') {
     }
 
     orderList.innerHTML = filtered.map(order => `
-        <div class="order-card" onclick="openOrder('${order.id}')">
+        <div class="order-card" onclick="openOrder('${order.id}')" oncontextmenu="event.preventDefault();showDeleteMenu(event,'${order.id}','${(order.order_id||order.receiver_name||'').replace(/'/g,'')}')">
             <div class="order-header">
                 <span class="order-id">
                     ${order.order_id || '<span class="pending">待生成编号</span>'}
@@ -537,6 +537,39 @@ async function togglePayment(id, field, value) {
         renderOrders(currentFilter);
     } catch (error) {
         alert('更新失败: ' + (error.message || '未知错误'));
+    }
+}
+
+// 右键删除菜单
+function showDeleteMenu(e, id, name) {
+    const old = document.getElementById('ctxMenu');
+    if (old) old.remove();
+
+    const menu = document.createElement('div');
+    menu.id = 'ctxMenu';
+    menu.style.cssText = `position:fixed;left:${e.clientX}px;top:${e.clientY}px;background:white;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.15);padding:6px 0;z-index:9999;min-width:140px;`;
+    menu.innerHTML = `<div onclick="deleteOrder('${id}','${name}')" style="padding:10px 16px;cursor:pointer;color:#dc3545;font-size:14px;display:flex;align-items:center;gap:6px;" onmouseover="this.style.background='#fff5f5'" onmouseout="this.style.background='white'">🗑 删除订单</div>`;
+    document.body.appendChild(menu);
+
+    const dismiss = (ev) => { if (!menu.contains(ev.target)) { menu.remove(); document.removeEventListener('click', dismiss); } };
+    setTimeout(() => document.addEventListener('click', dismiss), 0);
+}
+
+async function deleteOrder(id, name) {
+    const old = document.getElementById('ctxMenu');
+    if (old) old.remove();
+
+    if (!confirm(`确定删除「${name}」？删除后不可恢复`)) return;
+
+    try {
+        const { error } = await supabaseClient
+            .from('orders')
+            .delete()
+            .eq('id', id);
+        if (error) throw error;
+        await fetchOrders();
+    } catch (error) {
+        alert('删除失败: ' + (error.message || '未知错误'));
     }
 }
 
