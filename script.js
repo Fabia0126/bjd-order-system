@@ -51,6 +51,8 @@ const addonKoupei = document.getElementById('addonKoupei');
 const koupeiQty = document.getElementById('koupeiQty');
 
 const DRAFT_KEY = 'bjd_order_draft';
+const IMG_KEY = 'bjd_order_images';
+let savedImages = [];
 
 function saveDraft() {
     const data = {};
@@ -139,6 +141,7 @@ function clearDraft() {
 // 初始化
 document.addEventListener('DOMContentLoaded', () => {
     loadDraft();
+    loadSavedImages();
     updatePrice();
     updatePriceLabels();
     updateConditionalFields();
@@ -329,8 +332,70 @@ function setupEventListeners() {
         });
     });
 
+    // 参考图选择后保存+预览
+    const fileInput = document.querySelector('input[name="referenceImages"]');
+    if (fileInput) {
+        fileInput.addEventListener('change', saveImages);
+    }
+
     // 表单提交
     form.addEventListener('submit', handleSubmit);
+}
+
+function saveImages() {
+    const fileInput = document.querySelector('input[name="referenceImages"]');
+    if (!fileInput || !fileInput.files.length) return;
+
+    savedImages = [];
+    const promises = [];
+    for (const file of fileInput.files) {
+        promises.push(new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                savedImages.push({ name: file.name, type: file.type, data: e.target.result });
+                resolve();
+            };
+            reader.readAsDataURL(file);
+        }));
+    }
+    Promise.all(promises).then(() => {
+        try {
+            localStorage.setItem(IMG_KEY, JSON.stringify(savedImages));
+        } catch (e) {
+            // localStorage满了就算了，不影响正常使用
+        }
+        renderImagePreview();
+    });
+}
+
+function loadSavedImages() {
+    try {
+        const raw = localStorage.getItem(IMG_KEY);
+        if (!raw) return;
+        savedImages = JSON.parse(raw);
+        if (savedImages.length > 0) renderImagePreview();
+    } catch (e) {}
+}
+
+function renderImagePreview() {
+    const preview = document.getElementById('imagePreview');
+    if (!preview) return;
+    if (savedImages.length === 0) {
+        preview.innerHTML = '';
+        return;
+    }
+    preview.innerHTML = savedImages.map((img, i) => `
+        <div style="position:relative;display:inline-block;">
+            <img src="${img.data}" style="width:60px;height:60px;object-fit:cover;border-radius:8px;border:1px solid #e8e0eb;">
+            <span onclick="removeImage(${i})" style="position:absolute;top:-6px;right:-6px;width:18px;height:18px;background:#dc3545;color:white;border-radius:50%;font-size:12px;line-height:18px;text-align:center;cursor:pointer;">×</span>
+        </div>
+    `).join('');
+}
+
+function removeImage(index) {
+    savedImages.splice(index, 1);
+    try { localStorage.setItem(IMG_KEY, JSON.stringify(savedImages)); } catch(e) {}
+    renderImagePreview();
 }
 
 function updatePrice() {
@@ -668,22 +733,45 @@ async function confirmSubmit() {
 
     try {
         const fileInput = document.querySelector('input[name="referenceImages"]');
-        if (fileInput && fileInput.files.length > 0) {
+        const hasNewFiles = fileInput && fileInput.files.length > 0;
+        const hasSavedImages = savedImages.length > 0;
+
+        if (hasNewFiles || hasSavedImages) {
             if (confirmBtn) confirmBtn.textContent = '正在上传图片...';
             const imageUrls = [];
-            for (const file of fileInput.files) {
-                const ext = file.name.split('.').pop();
-                const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-                const { error: uploadError } = await supabaseClient.storage
-                    .from('reference-images')
-                    .upload(fileName, file);
-                if (!uploadError) {
-                    const { data: urlData } = supabaseClient.storage
+
+            if (hasNewFiles) {
+                for (const file of fileInput.files) {
+                    const ext = file.name.split('.').pop();
+                    const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+                    const { error: uploadError } = await supabaseClient.storage
                         .from('reference-images')
-                        .getPublicUrl(fileName);
-                    imageUrls.push(urlData.publicUrl);
+                        .upload(fileName, file);
+                    if (!uploadError) {
+                        const { data: urlData } = supabaseClient.storage
+                            .from('reference-images')
+                            .getPublicUrl(fileName);
+                        imageUrls.push(urlData.publicUrl);
+                    }
+                }
+            } else if (hasSavedImages) {
+                for (const img of savedImages) {
+                    const resp = await fetch(img.data);
+                    const blob = await resp.blob();
+                    const ext = img.name.split('.').pop() || 'jpg';
+                    const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+                    const { error: uploadError } = await supabaseClient.storage
+                        .from('reference-images')
+                        .upload(fileName, blob);
+                    if (!uploadError) {
+                        const { data: urlData } = supabaseClient.storage
+                            .from('reference-images')
+                            .getPublicUrl(fileName);
+                        imageUrls.push(urlData.publicUrl);
+                    }
                 }
             }
+
             if (imageUrls.length > 0) {
                 orderData.reference_images = imageUrls;
             }
@@ -712,6 +800,9 @@ async function confirmSubmit() {
 
         closePreview();
         clearDraft();
+        savedImages = [];
+        try { localStorage.removeItem(IMG_KEY); } catch(e) {}
+        document.getElementById('imagePreview').innerHTML = '';
 
         document.getElementById('orderForm').reset();
         document.getElementById('agreeNotice').checked = false;
