@@ -131,13 +131,21 @@ async function fetchSettings() {
     }
 }
 
-// 生成订单编号
+// 生成订单编号（取当前最大编号+1，避免重复）
 function generateOrderId() {
-    const approvedOrders = allOrders.filter(o => o.status !== 'pending' && o.status !== 'rejected');
-    const nextNum = approvedOrders.length + 1;
     const date = new Date();
     const dateStr = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}`;
-    return `BJD${dateStr}-${String(nextNum).padStart(3, '0')}`;
+    const prefix = `BJD${dateStr}-`;
+
+    let maxNum = 0;
+    allOrders.forEach(o => {
+        if (o.order_id && o.order_id.startsWith(prefix)) {
+            const num = parseInt(o.order_id.replace(prefix, ''));
+            if (num > maxNum) maxNum = num;
+        }
+    });
+
+    return `${prefix}${String(maxNum + 1).padStart(3, '0')}`;
 }
 
 // 渲染订单列表
