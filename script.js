@@ -322,19 +322,10 @@ function updateCountdown() {
 }
 
 function updateSubmitButton() {
-    const selectedType = document.querySelector('input[name="orderType"]:checked').value;
-    const agreed = agreeNotice.checked;
-
-    if (selectedType === 'normal' && !isNormalOpen) {
-        submitBtn.disabled = true;
-        submitBtn.textContent = '等待开放...';
-    } else if (selectedType === 'normal' && normalLimit > 0 && normalRemaining <= 0) {
-        submitBtn.disabled = true;
-        submitBtn.textContent = '普单已抢完';
-    } else {
-        submitBtn.disabled = !agreed;
-        submitBtn.textContent = '提交小纸条';
-    }
+    // 紧急关闭：所有订单类型暂停接单
+    submitBtn.disabled = true;
+    submitBtn.textContent = '已暂停接单';
+    return;
 }
 
 function setupEventListeners() {
