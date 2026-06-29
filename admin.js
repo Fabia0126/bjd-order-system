@@ -179,6 +179,7 @@ function renderOrders(filter = 'all') {
             <div class="order-header">
                 <span class="order-id">
                     ${order.order_id || '<span class="pending">待生成编号</span>'}
+                    ${order.addons && order.addons.includes('加急') ? '<span class="rush-tag">加急</span>' : ''}
                 </span>
                 <span class="order-status status-${order.status}">${STATUS[order.status]}</span>
             </div>
