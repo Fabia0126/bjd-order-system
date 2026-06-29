@@ -501,7 +501,7 @@ function exportOrders() {
         '娃社+官名+肤色', '属性', '性别', '色系',
         '禁忌', '要求', '加购项', '免费项', '闪粉',
         '随箱物品', '闲鱼ID', '收件人', '联系方式1', '联系方式2',
-        '快递', '总价', '提交时间'
+        '快递', '总价', '定金', '尾款', '提交时间'
     ];
 
     const rows = allOrders.map(o => [
@@ -526,6 +526,8 @@ function exportOrders() {
         o.contact2,
         o.shipping,
         o.total_price,
+        o.deposit_paid ? '已付' : '未付',
+        o.final_paid ? '已付' : '未付',
         o.submit_time ? new Date(o.submit_time).toLocaleString('zh-CN') : ''
     ]);
 
