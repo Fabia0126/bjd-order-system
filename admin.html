@@ -39,7 +39,7 @@
             <div class="header-actions">
                 <button class="btn-refresh" onclick="manualRefresh()" style="padding:8px 14px;border:1.5px solid #e8e0eb;border-radius:8px;background:white;cursor:pointer;font-size:14px;" title="手动刷新">🔄</button>
                 <button class="btn-export" onclick="exportOrders()">导出表格</button>
-                <button class="btn-settings" onclick="openSettings()">普单设置</button>
+                <button class="btn-settings" onclick="openSettings()">接单设置</button>
             </div>
         </header>
 
@@ -99,16 +99,25 @@
         </div>
     </div>
 
-    <!-- 普单设置弹窗 -->
+    <!-- 接单设置弹窗 -->
     <div class="modal" id="settingsModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>普单设置</h2>
+                <h2>接单设置</h2>
                 <button class="close-btn" onclick="closeSettings()">&times;</button>
             </div>
             <div class="modal-body">
+                <div class="setting-item" style="background:#fdf2f8;border-radius:12px;padding:14px;">
+                    <label style="font-weight:600;color:#d485a8;">💰 钞能力单</label>
+                    <div class="toggle-group">
+                        <button class="toggle-btn" id="premiumOn" onclick="setPremiumStatus(true)">开放</button>
+                        <button class="toggle-btn" id="premiumOff" onclick="setPremiumStatus(false)">关闭</button>
+                    </div>
+                    <p class="setting-hint" id="premiumStatus" style="margin-top:6px;font-size:12px;color:#888;">当前钞单数：<span id="currentPremiumCount">0</span></p>
+                </div>
+                <hr style="border:none;border-top:1px solid #e8e0eb;margin:12px 0;">
                 <div class="setting-item">
-                    <label>普单状态</label>
+                    <label style="font-weight:600;">📋 普单</label>
                     <div class="toggle-group">
                         <button class="toggle-btn" id="normalOn" onclick="setNormalStatus(true)">开放</button>
                         <button class="toggle-btn" id="normalOff" onclick="setNormalStatus(false)">关闭</button>

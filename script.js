@@ -189,6 +189,7 @@ function getPollingDelay() {
 let countdownInterval = null;
 let normalOpenTime = null;
 let isNormalOpen = true;
+let isPremiumOpen = true;
 let normalLimit = 0;
 let normalRemaining = -1;
 
@@ -208,6 +209,7 @@ async function checkNormalStatus() {
         const countdownText = document.getElementById('countdownText');
 
         normalLimit = settings.normal_limit || 0;
+        isPremiumOpen = settings.premium_open !== false;
 
         // 查剩余名额
         if (normalLimit > 0) {
@@ -237,7 +239,7 @@ async function checkNormalStatus() {
                 }
             } else {
                 if (statusText) {
-                    statusText.textContent = '普单已满，当前仅接受钞能力单';
+                    statusText.textContent = isPremiumOpen ? '普单已满，当前仅接受钞能力单' : '暂停接单';
                     statusText.classList.add('show');
                 }
                 if (countdownDisplay) {
@@ -252,7 +254,7 @@ async function checkNormalStatus() {
 
             if (normalLimit > 0 && normalRemaining <= 0) {
                 if (statusText) {
-                    statusText.textContent = '普单已抢完，当前仅接受钞能力单';
+                    statusText.textContent = isPremiumOpen ? '普单已抢完，当前仅接受钞能力单' : '暂停接单';
                     statusText.classList.add('show');
                 }
                 updateSubmitButton();
@@ -322,10 +324,22 @@ function updateCountdown() {
 }
 
 function updateSubmitButton() {
-    // 紧急关闭：所有订单类型暂停接单
-    submitBtn.disabled = true;
-    submitBtn.textContent = '已暂停接单';
-    return;
+    const selectedType = document.querySelector('input[name="orderType"]:checked').value;
+    const agreed = agreeNotice.checked;
+
+    if (selectedType === 'normal' && !isNormalOpen) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = '等待开放...';
+    } else if (selectedType === 'normal' && normalLimit > 0 && normalRemaining <= 0) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = '普单已抢完';
+    } else if (selectedType === 'premium' && !isPremiumOpen) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = '钞能力单暂停接单';
+    } else {
+        submitBtn.disabled = !agreed;
+        submitBtn.textContent = '提交小纸条';
+    }
 }
 
 function setupEventListeners() {
@@ -755,6 +769,21 @@ async function confirmSubmit() {
     await new Promise(r => setTimeout(r, Math.random() * 2000));
 
     if (confirmBtn) confirmBtn.textContent = '正在提交...';
+
+    // 钞单提交前检查开关
+    if (data.orderType === '钞能力单') {
+        try {
+            const { data: settings } = await supabaseClient
+                .from('settings').select('premium_open').eq('id', 1).single();
+            if (settings && settings.premium_open === false) {
+                alert('钞能力单暂停接单，请稍后再试');
+                if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = '确认提交'; }
+                if (cancelBtn) cancelBtn.disabled = false;
+                closePreview();
+                return;
+            }
+        } catch (e) {}
+    }
 
     // 普单提交前快速检查库存
     if (data.orderType === '普单' && normalLimit > 0) {

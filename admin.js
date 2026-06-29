@@ -376,14 +376,20 @@ async function updateOrderStatus(id, newStatus, rejectReason) {
     }
 }
 
-// 普单设置
+// 接单设置
 async function openSettings() {
     document.getElementById('settingsModal').classList.add('show');
 
     const normalCount = allOrders.filter(o => o.order_type === '普单' && o.status !== 'rejected').length;
+    const premiumCount = allOrders.filter(o => o.order_type === '钞能力单' && o.status !== 'rejected').length;
     document.getElementById('currentNormalCount').textContent = normalCount;
+    document.getElementById('currentPremiumCount').textContent = premiumCount;
 
     const settings = await fetchSettings();
+
+    const premiumOpen = settings.premium_open !== false;
+    document.getElementById('premiumOn').classList.toggle('active', premiumOpen);
+    document.getElementById('premiumOff').classList.toggle('active', !premiumOpen);
 
     document.getElementById('normalOn').classList.toggle('active', settings.normal_open);
     document.getElementById('normalOff').classList.toggle('active', !settings.normal_open);
@@ -397,6 +403,12 @@ async function openSettings() {
     }
 
     updateTimerStatus();
+}
+
+function setPremiumStatus(isOpen) {
+    document.getElementById('premiumOn').classList.toggle('active', isOpen);
+    document.getElementById('premiumOff').classList.toggle('active', !isOpen);
+    saveSettings();
 }
 
 function closeSettings() {
@@ -451,6 +463,7 @@ async function saveSettings() {
         normal_open: document.getElementById('normalOn').classList.contains('active'),
         normal_limit: parseInt(document.getElementById('normalLimit').value) || 0,
         normal_open_time: timeVal ? new Date(timeVal).toISOString() : null,
+        premium_open: document.getElementById('premiumOn').classList.contains('active'),
         updated_at: new Date().toISOString()
     };
 
