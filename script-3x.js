@@ -153,13 +153,13 @@ async function checkPremiumStatus() {
     try {
         const { data: settings, error } = await supabaseClient
             .from('settings')
-            .select('premium_open')
+            .select('premium_3x_open')
             .eq('id', 1)
             .single();
 
         if (error) throw error;
 
-        isPremiumOpen = settings.premium_open !== false;
+        isPremiumOpen = settings.premium_3x_open !== false;
         updateSubmitButton();
     } catch (error) {}
 }
@@ -568,8 +568,8 @@ async function confirmSubmit() {
     // 提交前检查开关
     try {
         const { data: settings } = await supabaseClient
-            .from('settings').select('premium_open').eq('id', 1).single();
-        if (settings && settings.premium_open === false) {
+            .from('settings').select('premium_3x_open').eq('id', 1).single();
+        if (settings && settings.premium_3x_open === false) {
             alert('三倍超暂停接单，请稍后再试');
             if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = '确认提交'; }
             if (cancelBtn) cancelBtn.disabled = false;

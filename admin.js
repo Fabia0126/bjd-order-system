@@ -127,7 +127,7 @@ async function fetchSettings() {
         return data;
     } catch (error) {
         console.error('获取设置失败:', error);
-        return { normal_open: true, normal_limit: 0, normal_open_time: null };
+        return { normal_open: true, normal_limit: 0, normal_open_time: null, premium_open: true, premium_3x_open: true };
     }
 }
 
@@ -391,14 +391,20 @@ async function openSettings() {
 
     const normalCount = allOrders.filter(o => o.order_type === '普单' && o.status !== 'rejected').length;
     const premiumCount = allOrders.filter(o => o.order_type === '钞能力单' && o.status !== 'rejected').length;
+    const premium3xCount = allOrders.filter(o => o.order_type === '三倍超' && o.status !== 'rejected').length;
     document.getElementById('currentNormalCount').textContent = normalCount;
     document.getElementById('currentPremiumCount').textContent = premiumCount;
+    document.getElementById('currentPremium3xCount').textContent = premium3xCount;
 
     const settings = await fetchSettings();
 
     const premiumOpen = settings.premium_open !== false;
     document.getElementById('premiumOn').classList.toggle('active', premiumOpen);
     document.getElementById('premiumOff').classList.toggle('active', !premiumOpen);
+
+    const premium3xOpen = settings.premium_3x_open !== false;
+    document.getElementById('premium3xOn').classList.toggle('active', premium3xOpen);
+    document.getElementById('premium3xOff').classList.toggle('active', !premium3xOpen);
 
     document.getElementById('normalOn').classList.toggle('active', settings.normal_open);
     document.getElementById('normalOff').classList.toggle('active', !settings.normal_open);
@@ -417,6 +423,12 @@ async function openSettings() {
 function setPremiumStatus(isOpen) {
     document.getElementById('premiumOn').classList.toggle('active', isOpen);
     document.getElementById('premiumOff').classList.toggle('active', !isOpen);
+    saveSettings();
+}
+
+function set3xStatus(isOpen) {
+    document.getElementById('premium3xOn').classList.toggle('active', isOpen);
+    document.getElementById('premium3xOff').classList.toggle('active', !isOpen);
     saveSettings();
 }
 
@@ -473,6 +485,7 @@ async function saveSettings() {
         normal_limit: parseInt(document.getElementById('normalLimit').value) || 0,
         normal_open_time: timeVal ? new Date(timeVal).toISOString() : null,
         premium_open: document.getElementById('premiumOn').classList.contains('active'),
+        premium_3x_open: document.getElementById('premium3xOn').classList.contains('active'),
         updated_at: new Date().toISOString()
     };
 
