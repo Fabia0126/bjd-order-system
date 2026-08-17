@@ -274,6 +274,10 @@
                             <span class="info-label">提交时间</span>
                             <span class="info-value">${formatTime(order.submit_time)}</span>
                         </div>
+                        ${order.work_start_time ? `<div class="info-row">
+                            <span class="info-label">开始施工</span>
+                            <span class="info-value">${formatTime(order.work_start_time)}</span>
+                        </div>` : ''}
                     </div>
                     ${order.status === 'rejected' ? `
                     <div class="reject-reason-box">

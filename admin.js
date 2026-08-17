@@ -277,6 +277,13 @@ function openOrder(id) {
             </div>
         </div>
         <div class="detail-section">
+            <h3>时间</h3>
+            <div class="detail-content">
+                <div class="detail-row"><span class="detail-label">提交时间</span><span class="detail-value">${order.submit_time ? formatTime(order.submit_time) : '-'}</span></div>
+                <div class="detail-row"><span class="detail-label">开始施工</span><span class="detail-value">${order.work_start_time ? formatTime(order.work_start_time) : '-'}</span></div>
+            </div>
+        </div>
+        <div class="detail-section">
             <h3>价格</h3>
             <div class="detail-content">
                 <div class="detail-row"><span class="detail-label">总价</span><span class="detail-value" style="color: #d485a8; font-size: 18px;">${order.total_price}</span></div>
@@ -353,6 +360,10 @@ async function updateOrderStatus(id, newStatus, rejectReason) {
 
         if (newStatus === 'approved') {
             updateData.order_id = generateOrderId();
+        }
+
+        if (newStatus === 'working') {
+            updateData.work_start_time = new Date().toISOString();
         }
 
         if (newStatus === 'rejected' && rejectReason) {
