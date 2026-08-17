@@ -357,27 +357,50 @@
         }
 
         async function fetchWeather() {
-            const url = `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&daily=weather_code,precipitation_sum,relative_humidity_2m_max&timezone=${TIMEZONE}&past_days=92&forecast_days=10`;
+            const url = `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&hourly=weather_code,precipitation,relative_humidity_2m&timezone=${TIMEZONE}&past_days=92&forecast_days=10`;
             const resp = await fetch(url);
             const data = await resp.json();
 
-            const dates = data.daily.time;
-            const codes = data.daily.weather_code;
-            const precip = data.daily.precipitation_sum;
-            const humidity = data.daily.relative_humidity_2m_max;
+            const times = data.hourly.time;
+            const codes = data.hourly.weather_code;
+            const precip = data.hourly.precipitation;
+            const humidity = data.hourly.relative_humidity_2m;
 
-            for (let i = 0; i < dates.length; i++) {
-                weatherData[dates[i]] = {
-                    code: codes[i],
-                    precip: precip[i],
-                    humidity: humidity[i],
-                    rainy: isRainy(codes[i])
+            const DAY_START = 8;
+            const DAY_END = 18;
+
+            const dayMap = {};
+            for (let i = 0; i < times.length; i++) {
+                const dt = new Date(times[i]);
+                const hour = dt.getHours();
+                if (hour < DAY_START || hour >= DAY_END) continue;
+
+                const key = times[i].slice(0, 10);
+                if (!dayMap[key]) dayMap[key] = { codes: [], precips: [], humidities: [] };
+                dayMap[key].codes.push(codes[i]);
+                dayMap[key].precips.push(precip[i]);
+                dayMap[key].humidities.push(humidity[i]);
+            }
+
+            const allDates = Object.keys(dayMap).sort();
+            for (const key of allDates) {
+                const d = dayMap[key];
+                const maxCode = Math.max(...d.codes);
+                const totalPrecip = d.precips.reduce((a, b) => a + b, 0);
+                const maxHumidity = Math.max(...d.humidities);
+                const rainy = maxCode >= 50;
+
+                weatherData[key] = {
+                    code: maxCode,
+                    precip: Math.round(totalPrecip * 10) / 10,
+                    humidity: maxHumidity,
+                    rainy
                 };
             }
 
-            if (dates.length > 0) {
-                dataMinDate = new Date(dates[0]);
-                dataMaxDate = new Date(dates[dates.length - 1]);
+            if (allDates.length > 0) {
+                dataMinDate = new Date(allDates[0]);
+                dataMaxDate = new Date(allDates[allDates.length - 1]);
             }
         }
 
@@ -404,7 +427,7 @@
                     <div class="today-info">
                         <div class="today-label">今日天气</div>
                         <div class="today-status">${status} · ${workable ? '可施工 ✓' : '不宜施工'}</div>
-                        <div class="today-detail">降水 ${todayData.precip}mm</div>
+                        <div class="today-detail">白天降水 ${todayData.precip}mm</div>
                     </div>
                     <div class="today-humidity">
                         <div class="humidity-value">${todayData.humidity}%</div>
@@ -509,7 +532,7 @@
             // Note
             html += `
             <div class="note-card">
-                工期按晴天计算，连续阴雨天气会适当延长。日历中半透明的日期为天气预报（仅供参考）。湿度为当日最高相对湿度。
+                工期按晴天计算，连续阴雨天气会适当延长。仅统计白天时段（8:00-18:00）降雨情况，夜间降雨不影响晴天判定。日历中半透明的日期为天气预报（仅供参考）。湿度为白天最高相对湿度。
             </div>
             <div style="text-align:center;padding:12px 0 20px;font-size:11px;color:rgba(255,255,255,0.7);line-height:1.6;">
                 气象数据由 <a href="https://open-meteo.com/" target="_blank" rel="noopener" style="color:rgba(255,255,255,0.9);text-decoration:underline;">Open-Meteo</a> 提供<br>
