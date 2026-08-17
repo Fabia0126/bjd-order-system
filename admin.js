@@ -280,7 +280,7 @@ function openOrder(id) {
             <h3>时间</h3>
             <div class="detail-content">
                 <div class="detail-row"><span class="detail-label">提交时间</span><span class="detail-value">${order.submit_time ? formatTime(order.submit_time) : '-'}</span></div>
-                <div class="detail-row"><span class="detail-label">开始施工</span><span class="detail-value">${order.work_start_time ? formatTime(order.work_start_time) : '-'}</span></div>
+                <div class="detail-row"><span class="detail-label">开始施工</span><span class="detail-value">${order.work_start_time ? formatTime(order.work_start_time) : '-'} <button onclick="editWorkStartTime('${order.id}', '${order.work_start_time || ''}')" style="margin-left:8px;padding:2px 8px;font-size:12px;border:1px solid #e8e0eb;border-radius:6px;background:white;color:#d485a8;cursor:pointer;">修改</button></span></div>
             </div>
         </div>
         <div class="detail-section">
@@ -339,6 +339,47 @@ async function confirmReject(id) {
     const overlay = document.querySelector('.reject-dialog-overlay');
     if (overlay) overlay.remove();
     await updateOrderStatus(id, 'rejected', reason);
+}
+
+function editWorkStartTime(id, currentTime) {
+    const existingDialog = document.querySelector('.date-edit-overlay');
+    if (existingDialog) existingDialog.remove();
+
+    const defaultVal = currentTime ? new Date(currentTime).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16);
+
+    const overlay = document.createElement('div');
+    overlay.className = 'date-edit-overlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px;';
+    overlay.innerHTML = `
+        <div style="background:white;border-radius:16px;padding:24px;max-width:360px;width:100%;">
+            <h3 style="color:#d485a8;margin-bottom:16px;">修改施工开始时间</h3>
+            <input type="datetime-local" id="workStartTimeInput" value="${defaultVal}" style="width:100%;padding:12px;border:1.5px solid #e8e0eb;border-radius:10px;font-size:14px;box-sizing:border-box;">
+            <div style="display:flex;gap:10px;margin-top:16px;">
+                <button onclick="confirmWorkStartTime('${id}')" style="flex:1;padding:12px;background:linear-gradient(135deg,#d485a8,#b8699a);color:white;border:none;border-radius:10px;font-size:15px;cursor:pointer;">确认</button>
+                <button onclick="this.closest('.date-edit-overlay').remove()" style="flex:1;padding:12px;background:#f0f0f0;color:#666;border:none;border-radius:10px;font-size:15px;cursor:pointer;">取消</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+}
+
+async function confirmWorkStartTime(id) {
+    const input = document.getElementById('workStartTimeInput');
+    const overlay = document.querySelector('.date-edit-overlay');
+    if (!input.value) { alert('请选择时间'); return; }
+
+    try {
+        const { error } = await supabaseClient
+            .from('orders')
+            .update({ work_start_time: new Date(input.value).toISOString(), last_update: new Date().toISOString() })
+            .eq('id', id);
+        if (error) throw error;
+        if (overlay) overlay.remove();
+        closeModal();
+        await fetchOrders();
+    } catch (e) {
+        alert('更新失败: ' + e.message);
+    }
 }
 
 // 更新订单状态
