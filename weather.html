@@ -367,7 +367,7 @@
             const humidity = data.hourly.relative_humidity_2m;
 
             const DAY_START = 10;
-            const DAY_END = 20;
+            const DAY_END = 18;
 
             const dayMap = {};
             for (let i = 0; i < times.length; i++) {
@@ -388,7 +388,7 @@
                 const maxCode = Math.max(...d.codes);
                 const totalPrecip = d.precips.reduce((a, b) => a + b, 0);
                 const maxHumidity = Math.max(...d.humidities);
-                const rainy = maxCode >= 50;
+                const rainy = maxCode >= 50 && totalPrecip >= 1;
 
                 weatherData[key] = {
                     code: maxCode,
@@ -532,7 +532,7 @@
             // Note
             html += `
             <div class="note-card">
-                工期按晴天计算，连续阴雨天气会适当延长。仅统计工作时段（10:00-20:00）降雨情况，夜间降雨不影响晴天判定。日历中半透明的日期为天气预报（仅供参考）。湿度为白天最高相对湿度。
+                工期按晴天计算，连续阴雨天气会适当延长。仅统计工作时段（10:00-18:00）降雨情况，降水不足1mm的毛毛雨不计，夜间降雨不影响晴天判定。日历中半透明的日期为天气预报（仅供参考）。湿度为白天最高相对湿度。
             </div>
             <div style="text-align:center;padding:12px 0 20px;font-size:11px;color:rgba(255,255,255,0.7);line-height:1.6;">
                 气象数据由 <a href="https://open-meteo.com/" target="_blank" rel="noopener" style="color:rgba(255,255,255,0.9);text-decoration:underline;">Open-Meteo</a> 提供<br>
