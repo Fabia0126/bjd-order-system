@@ -357,47 +357,55 @@
         }
 
         async function fetchWeather() {
-            const url = `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&hourly=weather_code,precipitation,relative_humidity_2m&timezone=${TIMEZONE}&past_days=92&forecast_days=10`;
-            const resp = await fetch(url);
-            const data = await resp.json();
+            const start = new Date();
+            start.setFullYear(start.getFullYear() - 1);
+            const end = new Date();
+            end.setDate(end.getDate() - 2);
+            const historyUrl = `https://archive-api.open-meteo.com/v1/archive?latitude=${LAT}&longitude=${LON}&start_date=${dateKey(start.getFullYear(), start.getMonth(), start.getDate())}&end_date=${dateKey(end.getFullYear(), end.getMonth(), end.getDate())}&hourly=weather_code,precipitation,relative_humidity_2m&timezone=${TIMEZONE}`;
+            const forecastUrl = `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&hourly=weather_code,precipitation,relative_humidity_2m&timezone=${TIMEZONE}&past_days=7&forecast_days=10`;
+            const responses = await Promise.all([fetch(historyUrl), fetch(forecastUrl)]);
+            if (responses.some(resp => !resp.ok)) throw new Error('天气服务暂时不可用');
+            const datasets = await Promise.all(responses.map(resp => resp.json()));
 
-            const times = data.hourly.time;
-            const codes = data.hourly.weather_code;
-            const precip = data.hourly.precipitation;
-            const humidity = data.hourly.relative_humidity_2m;
+            weatherData = {};
+            for (const data of datasets) {
+                const times = data.hourly.time;
+                const codes = data.hourly.weather_code;
+                const precip = data.hourly.precipitation;
+                const humidity = data.hourly.relative_humidity_2m;
 
-            const DAY_START = 10;
-            const DAY_END = 18;
+                const DAY_START = 10;
+                const DAY_END = 18;
 
-            const dayMap = {};
-            for (let i = 0; i < times.length; i++) {
-                const dt = new Date(times[i]);
-                const hour = dt.getHours();
-                if (hour < DAY_START || hour >= DAY_END) continue;
+                const dayMap = {};
+                for (let i = 0; i < times.length; i++) {
+                    const hour = Number(times[i].slice(11, 13));
+                    if (hour < DAY_START || hour >= DAY_END) continue;
 
-                const key = times[i].slice(0, 10);
-                if (!dayMap[key]) dayMap[key] = { codes: [], precips: [], humidities: [] };
-                dayMap[key].codes.push(codes[i]);
-                dayMap[key].precips.push(precip[i]);
-                dayMap[key].humidities.push(humidity[i]);
+                    const key = times[i].slice(0, 10);
+                    if (!dayMap[key]) dayMap[key] = { codes: [], precips: [], humidities: [] };
+                    dayMap[key].codes.push(codes[i]);
+                    dayMap[key].precips.push(precip[i]);
+                    dayMap[key].humidities.push(humidity[i]);
+                }
+
+                const allDates = Object.keys(dayMap).sort();
+                for (const key of allDates) {
+                    const d = dayMap[key];
+                    const maxCode = Math.max(...d.codes);
+                    const totalPrecip = d.precips.reduce((a, b) => a + b, 0);
+                    const maxHumidity = Math.max(...d.humidities);
+                    const rainy = maxCode >= 50 && totalPrecip >= 1;
+
+                    weatherData[key] = {
+                        code: maxCode,
+                        precip: Math.round(totalPrecip * 10) / 10,
+                        humidity: maxHumidity,
+                        rainy
+                    };
+                }
             }
-
-            const allDates = Object.keys(dayMap).sort();
-            for (const key of allDates) {
-                const d = dayMap[key];
-                const maxCode = Math.max(...d.codes);
-                const totalPrecip = d.precips.reduce((a, b) => a + b, 0);
-                const maxHumidity = Math.max(...d.humidities);
-                const rainy = maxCode >= 50 && totalPrecip >= 1;
-
-                weatherData[key] = {
-                    code: maxCode,
-                    precip: Math.round(totalPrecip * 10) / 10,
-                    humidity: maxHumidity,
-                    rainy
-                };
-            }
-
+            const allDates = Object.keys(weatherData).sort();
             if (allDates.length > 0) {
                 dataMinDate = new Date(allDates[0]);
                 dataMaxDate = new Date(allDates[allDates.length - 1]);
@@ -445,8 +453,8 @@
             const daysInMonth = lastDay.getDate();
 
             const monthNames = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
-            const canPrev = dataMinDate && new Date(year, month, 1) > dataMinDate;
-            const canNext = dataMaxDate && new Date(year, month + 1, 0) < dataMaxDate;
+            const canPrev = dataMinDate && new Date(year, month, 0) >= dataMinDate;
+            const canNext = dataMaxDate && new Date(year, month + 1, 1) <= dataMaxDate;
 
             html += `
             <div class="calendar-card">
@@ -537,7 +545,7 @@
             <div style="text-align:center;padding:12px 0 20px;font-size:11px;color:rgba(255,255,255,0.7);line-height:1.6;">
                 气象数据由 <a href="https://open-meteo.com/" target="_blank" rel="noopener" style="color:rgba(255,255,255,0.9);text-decoration:underline;">Open-Meteo</a> 提供<br>
                 观测站：绍兴新昌（29.50°N, 120.90°E）<br>
-                数据每日自动更新，含过去90天历史及10天预报
+                数据每日自动更新，含过去一年历史及10天预报
             </div>`;
 
             app.innerHTML = html;
