@@ -12,26 +12,13 @@
     <div id="loginOverlay" style="position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(135deg,#eea8cc 0%,#a2dbee 50%,#efe59d 100%);z-index:9999;display:flex;align-items:center;justify-content:center;">
         <div style="background:white;padding:40px;border-radius:20px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,0.15);max-width:320px;width:90%;">
             <h2 style="color:#d485a8;margin-bottom:20px;">🔐 后台登录</h2>
-            <input type="password" id="adminPassword" placeholder="请输入密码" style="width:100%;padding:14px;border:2px solid #e8e0eb;border-radius:10px;font-size:16px;margin-bottom:16px;box-sizing:border-box;" onkeypress="if(event.key==='Enter')checkPassword()">
-            <button onclick="checkPassword()" style="width:100%;padding:14px;background:linear-gradient(135deg,#d485a8 0%,#c08db8 100%);color:white;border:none;border-radius:10px;font-size:16px;cursor:pointer;">进入后台</button>
-            <p id="loginError" style="color:#dc3545;margin-top:12px;display:none;">密码错误</p>
+            <input type="email" id="adminEmail" placeholder="管理员邮箱" autocomplete="username" style="width:100%;padding:14px;border:2px solid #e8e0eb;border-radius:10px;font-size:16px;margin-bottom:10px;box-sizing:border-box;">
+            <input type="password" id="adminPassword" placeholder="密码" autocomplete="current-password" style="width:100%;padding:14px;border:2px solid #e8e0eb;border-radius:10px;font-size:16px;margin-bottom:16px;box-sizing:border-box;" onkeypress="if(event.key==='Enter')adminLogin()">
+            <button onclick="adminLogin()" style="width:100%;padding:14px;background:linear-gradient(135deg,#d485a8 0%,#c08db8 100%);color:white;border:none;border-radius:10px;font-size:16px;cursor:pointer;">进入后台</button>
+            <p id="loginError" style="color:#dc3545;margin-top:12px;display:none;">邮箱或密码不对</p>
+            <p style="margin-top:12px;font-size:13px;"><a href="lottery.html" style="color:#8a6d9e;">开单开奖台 →</a></p>
         </div>
     </div>
-    <script>
-        function checkPassword() {
-            const pwd = document.getElementById('adminPassword').value;
-            if (pwd === 'Fafaluxun20260126.') {
-                document.getElementById('loginOverlay').style.display = 'none';
-                sessionStorage.setItem('bjd_admin_auth', 'true');
-            } else {
-                document.getElementById('loginError').style.display = 'block';
-                document.getElementById('adminPassword').value = '';
-            }
-        }
-        if (sessionStorage.getItem('bjd_admin_auth') === 'true') {
-            document.getElementById('loginOverlay').style.display = 'none';
-        }
-    </script>
 
     <div class="container">
         <header>
@@ -40,6 +27,8 @@
                 <button class="btn-refresh" onclick="manualRefresh()" style="padding:8px 14px;border:1.5px solid #e8e0eb;border-radius:8px;background:white;cursor:pointer;font-size:14px;" title="手动刷新">🔄</button>
                 <button class="btn-export" onclick="exportOrders()">导出表格</button>
                 <button class="btn-settings" onclick="openSettings()">接单设置</button>
+                <button class="btn-settings" onclick="location.href='lottery.html'">开奖台</button>
+                <button class="btn-refresh" onclick="adminLogout()" style="padding:8px 14px;border:1.5px solid #e8e0eb;border-radius:8px;background:white;cursor:pointer;font-size:14px;">退出</button>
             </div>
         </header>
 
@@ -151,6 +140,8 @@
         </div>
     </div>
 
-    <script src="admin.js?v=8"></script>
+    <script src="lottery-config.js"></script>
+    <script src="frontend-security.js"></script>
+    <script src="admin.js?v=9"></script>
 </body>
 </html>

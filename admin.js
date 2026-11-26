@@ -2,12 +2,13 @@
 const SUPABASE_URL = 'https://assqothmzcsusnksdnmm.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFzc3FvdGhtemNzdXNua3Nkbm1tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzMzMwODEsImV4cCI6MjA5MzkwOTA4MX0.2OxbVdQQBANlv5_vmxitzR5CG79FrD3VPSFzX9laF9M';
 
+const ADMIN_CFG = window.LOTTERY_CONFIG || { url: SUPABASE_URL, anonKey: SUPABASE_ANON_KEY };
 let supabaseClient = null;
 try {
     if (typeof supabase !== 'undefined' && supabase.createClient) {
-        supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        supabaseClient = supabase.createClient(ADMIN_CFG.url, ADMIN_CFG.anonKey);
     } else if (typeof window.supabase !== 'undefined') {
-        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        supabaseClient = window.supabase.createClient(ADMIN_CFG.url, ADMIN_CFG.anonKey);
     } else {
         alert('Supabase库未加载！请刷新页面');
     }
@@ -36,7 +37,18 @@ const STATUS_FLOW = {
 };
 
 let currentFilter = 'all';
-let allOrders = [];
+let allOrders = [];      // 已转义，只给模板渲染用
+let rawOrders = [];      // 原始数据，导出/比对用
+const esc = (v) => window.BJDSecurity.escapeHTML(v);
+function escOrder(o) {
+    const out = {};
+    for (const [k, v] of Object.entries(o)) {
+        out[k] = Array.isArray(v) ? v.map(x => (typeof x === 'string' ? esc(x) : x))
+               : typeof v === 'string' ? esc(v) : v;
+    }
+    out._raw = o;
+    return out;
+}
 let lastFetchOk = true;
 let consecutiveFetchFails = 0;
 
@@ -49,7 +61,8 @@ async function fetchOrders() {
             .order('submit_time', { ascending: false });
 
         if (error) throw error;
-        allOrders = data || [];
+        rawOrders = data || [];
+        allOrders = rawOrders.map(escOrder);
         renderOrders(currentFilter);
         updateStats();
         consecutiveFetchFails = 0;
@@ -175,7 +188,7 @@ function renderOrders(filter = 'all') {
     }
 
     orderList.innerHTML = filtered.map(order => `
-        <div class="order-card" onclick="openOrder('${order.id}')" oncontextmenu="event.preventDefault();showDeleteMenu(event,'${order.id}','${(order.order_id||order.receiver_name||'').replace(/'/g,'')}')">
+        <div class="order-card" onclick="openOrder('${order.id}')" oncontextmenu="event.preventDefault();showDeleteMenu(event,'${order.id}')">
             <div class="order-header">
                 <span class="order-id">
                     ${order.order_id || '<span class="pending">待生成编号</span>'}
@@ -255,7 +268,7 @@ function openOrder(id) {
                 <div class="detail-row"><span class="detail-label">色系</span><span class="detail-value">${order.color_scheme}</span></div>
                 ${order.taboos && order.taboos.length > 0 ? `<div class="detail-row"><span class="detail-label">禁忌</span><span class="detail-value">${order.taboos.join('、')}</span></div>` : ''}
                 ${order.requirements && order.requirements.length > 0 ? `<div class="detail-row"><span class="detail-label">要求</span><span class="detail-value">${order.requirements.join('、')}</span></div>` : ''}
-                ${order.reference_images && order.reference_images.length > 0 ? `<div class="detail-row" style="flex-direction:column;align-items:flex-start;"><span class="detail-label" style="margin-bottom:8px;">参考图（${order.reference_images.length}张）</span><div style="display:flex;flex-wrap:wrap;gap:8px;">${order.reference_images.map(url => `<a href="${url}" target="_blank" style="display:block;"><img src="${url}" style="max-width:150px;max-height:150px;border-radius:8px;object-fit:cover;border:1px solid #e8e0eb;"></a>`).join('')}</div></div>` : ''}
+                ${order.reference_images && order.reference_images.length > 0 ? `<div class="detail-row" style="flex-direction:column;align-items:flex-start;"><span class="detail-label" style="margin-bottom:8px;">参考图（${order.reference_images.length}张）</span><div id="refImages" style="display:flex;flex-wrap:wrap;gap:8px;">加载中…</div></div>` : ''}
             </div>
         </div>
         <div class="detail-section">
@@ -306,6 +319,7 @@ function openOrder(id) {
     }
 
     modal.classList.add('show');
+    hydrateRefImages(detail, order);
     window.currentOrderId = id;
 }
 
@@ -400,7 +414,9 @@ async function updateOrderStatus(id, newStatus, rejectReason) {
         };
 
         if (newStatus === 'approved') {
-            updateData.order_id = generateOrderId();
+            const { error: apErr } = await supabaseClient.rpc('admin_approve_order', { p_id: id });
+            if (apErr) throw apErr;
+            delete updateData.status;            // 状态和编号已由服务端写好
         }
 
         if (newStatus === 'working') {
@@ -569,7 +585,7 @@ function exportOrders() {
         '快递', '总价', '定金', '尾款', '提交时间'
     ];
 
-    const rows = allOrders.map(o => [
+    const rows = rawOrders.map(o => [
         o.order_id || '待生成',
         STATUS[o.status] || o.status,
         o.order_type,
@@ -596,11 +612,7 @@ function exportOrders() {
         o.submit_time ? new Date(o.submit_time).toLocaleString('zh-CN') : ''
     ]);
 
-    const BOM = '﻿';
-    const csvContent = BOM + [
-        headers.join(','),
-        ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-    ].join('\n');
+    const csvContent = window.BJDSecurity.csvDocument(headers, rows);
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -630,21 +642,24 @@ async function togglePayment(id, field, value) {
 }
 
 // 右键删除菜单
-function showDeleteMenu(e, id, name) {
+function showDeleteMenu(e, id) {
+    if (!/^[0-9a-f-]{36}$/i.test(id)) return;
     const old = document.getElementById('ctxMenu');
     if (old) old.remove();
 
     const menu = document.createElement('div');
     menu.id = 'ctxMenu';
     menu.style.cssText = `position:fixed;left:${e.clientX}px;top:${e.clientY}px;background:white;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.15);padding:6px 0;z-index:9999;min-width:140px;`;
-    menu.innerHTML = `<div onclick="deleteOrder('${id}','${name}')" style="padding:10px 16px;cursor:pointer;color:#dc3545;font-size:14px;display:flex;align-items:center;gap:6px;" onmouseover="this.style.background='#fff5f5'" onmouseout="this.style.background='white'">🗑 删除订单</div>`;
+    menu.innerHTML = `<div onclick="deleteOrder('${id}')" style="padding:10px 16px;cursor:pointer;color:#dc3545;font-size:14px;display:flex;align-items:center;gap:6px;" onmouseover="this.style.background='#fff5f5'" onmouseout="this.style.background='white'">🗑 删除订单</div>`;
     document.body.appendChild(menu);
 
     const dismiss = (ev) => { if (!menu.contains(ev.target)) { menu.remove(); document.removeEventListener('click', dismiss); } };
     setTimeout(() => document.addEventListener('click', dismiss), 0);
 }
 
-async function deleteOrder(id, name) {
+async function deleteOrder(id) {
+    const o = rawOrders.find(x => x.id === id);
+    const name = o ? (o.order_id || o.receiver_name || '') : '';
     const old = document.getElementById('ctxMenu');
     if (old) old.remove();
 
@@ -674,6 +689,67 @@ document.querySelectorAll('.tab').forEach(tab => {
 
 // 初始化
 document.addEventListener('DOMContentLoaded', () => {
-    fetchOrders();
-    setInterval(fetchOrders, 10000);
+    adminBoot();
 });
+
+
+// ===== 管理员登录（Supabase Auth），登录且是管理员才加载订单 =====
+let pollTimer = null;
+async function adminBoot() {
+    const overlay = document.getElementById('loginOverlay');
+    const err = document.getElementById('loginError');
+    try {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (session) {
+            const { data: isAdmin } = await supabaseClient.rpc('is_admin');
+            if (isAdmin) {
+                overlay.style.display = 'none';
+                fetchOrders();
+                if (!pollTimer) pollTimer = setInterval(fetchOrders, 10000);
+                return;
+            }
+            await supabaseClient.auth.signOut();
+            err.textContent = '这个账号不是管理员'; err.style.display = 'block';
+        }
+    } catch (e) {
+        err.textContent = '加载失败，请刷新'; err.style.display = 'block';
+    }
+    overlay.style.display = 'flex';
+}
+async function adminLogin() {
+    const err = document.getElementById('loginError');
+    const email = document.getElementById('adminEmail').value.trim();
+    const pw = document.getElementById('adminPassword');
+    const { error } = await supabaseClient.auth.signInWithPassword({ email, password: pw.value });
+    pw.value = '';
+    if (error) { err.textContent = '邮箱或密码不对'; err.style.display = 'block'; return; }
+    err.style.display = 'none';
+    adminBoot();
+}
+async function adminLogout() {
+    if (pollTimer) clearInterval(pollTimer);
+    allOrders = []; rawOrders = [];
+    try { await supabaseClient.auth.signOut(); } finally { location.reload(); }
+}
+
+// 参考图：桶已私有，旧单存的是公开地址，统一换成 10 分钟签名地址
+function refPath(v) {
+    const s = String(v || '');
+    const m = s.match(/\/object\/(?:public|sign|authenticated)\/reference-images\/([^?]+)/);
+    return m ? decodeURIComponent(m[1]) : (/^entries\//.test(s) || /^[\w.-]+(\/[\w.-]+)*$/.test(s) ? s : null);
+}
+async function hydrateRefImages(container, order) {
+    const paths = (order._raw.reference_images || []).map(refPath).filter(Boolean);
+    const box = container.querySelector('#refImages');
+    if (!box || !paths.length) return;
+    const { data, error } = await supabaseClient.storage.from('reference-images').createSignedUrls(paths, 600);
+    if (error) { box.textContent = '参考图加载失败'; return; }
+    box.replaceChildren();
+    (data || []).forEach(d => {
+        if (!d.signedUrl) return;
+        const a = document.createElement('a'); a.href = d.signedUrl; a.target = '_blank'; a.rel = 'noopener';
+        const img = document.createElement('img'); img.src = d.signedUrl;
+        img.style.cssText = 'max-width:150px;max-height:150px;border-radius:8px;object-fit:cover;border:1px solid #e8e0eb;';
+        a.append(img); box.append(a);
+    });
+}
