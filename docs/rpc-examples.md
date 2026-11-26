@@ -43,3 +43,12 @@
 - Storage（真实 anon key 走 REST）：凭证路径上传 200；同名覆盖 409；text/html 400；越界目录/子目录 400；匿名 list 空；public/authenticated 读 400；绑定别人路径 invalid_payload；绑定后再传 400、再要票 conflict
 - 匿名 REST 读 orders：permission denied
 - 未测：并发多连接（同时确认/锁池/迟提交）、真实 Auth 登录后台、purge 后 storage 删除、文件内容魔数校验（目前只靠桶的 MIME 限制，信 Content-Type）
+
+## v0.4 / v0.5（2026-11-26 20:10 CST）
+- v0.4：confirm_win 也等在途收件提交完（与 lock_pool 同一把 submit 锁），手速前 N 名不会漏算还没落库、收到时间更早的投递
+- v0.5：**上传改为固定槽位**。request_upload 返回 `slots`：6 个完整对象名 `entries/{entry_id}/{upload_secret}/1..6`（没有扩展名，类型靠 Content-Type，桶限 jpeg/png/webp、5MB）。只能传到这 6 个名字，同名重复 Storage 拒绝，所以总数天然 ≤6；不再返回 prefix/max_files。attach_images 传的路径必须是这些槽位
+## 并发实测（测试库，Management API 多连接）
+- 30 人同时投递：全部收件；同一 request_id 并发 5 次：1 次 replay=false，4 次 replay=true，只落 1 条
+- 在途收件：窗口内投递、事务里 sleep 到关窗后才提交；关窗后 confirm_win+lock_pool 等它提交，M 把它算进去（lottery_pos=3）
+- 3 个并发确认手速：手速总数仍为 3；3 个并发 draw 结果完全一致，同时换号 draw → already_drawn；正式号 5 个唯一
+- 上传：v0.2 计数法 10 并发进了 7 张（超限，已废弃）；v0.5 槽位法 10 并发（含越界 7/8、重复）最终 6 张，第二张票传已占槽位 400
