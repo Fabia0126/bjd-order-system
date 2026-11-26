@@ -19,28 +19,41 @@ def ok(n,g,w): res.append(g==w); print(("✓ " if g==w else "✗ ")+n+("" if g==
 st,tk=http("POST","/auth/v1/token?grant_type=password",{"email":env["AFAMAKEUP_TEST_ADMIN_EMAIL"],"password":env["AFAMAKEUP_TEST_ADMIN_PASS"]}); A=tk["access_token"]
 def arpc(n,a): return http("POST",f"/rest/v1/rpc/{n}",a,bearer=A)[1]
 sql("update public.settings set maintenance=false where id=1;")
+sql("insert into public.admins select id from auth.users where email in ('luxun-admin-test@example.com') on conflict do nothing;")
 maxid0=sql("select max(order_id) m from public.orders")[0]["m"]; n0=sql("select count(*)::int n from public.orders")[0]["n"]
 from datetime import datetime, timezone, timedelta
-arpc("upsert_campaign",{"p_id":C,"p_open_at":(datetime.now(timezone.utc)+timedelta(seconds=3)).isoformat(),"p_window":12,"p_quotas":{"普":{"speed":1,"pick":1,"lottery":1},"钞":{"speed":1,"pick":0,"lottery":1}}})
-ok("标记演练",arpc("set_campaign_demo",{"p_id":C,"p_demo":True}).get("demo"),True)
-time.sleep(4); toks=[]
-for i in range(4):
+T0=time.time()
+ok("原子建演练批次",arpc("upsert_campaign",{"p_id":C,"p_open_at":(datetime.now(timezone.utc)+timedelta(seconds=3)).isoformat(),"p_window":40,"p_quotas":{"普":{"speed":1,"pick":1,"lottery":1},"钞":{"speed":1,"pick":0,"lottery":1}},"p_demo":True}).get("demo"),True)
+ok("公开状态带 demo",(http("POST","/rest/v1/rpc/campaign_status",{})[1].get("campaign") or {}).get("demo"),True)
+time.sleep(4); toks=[]; rc=None
+for i in range(6):
     t=secrets.token_urlsafe(32); toks.append(t)
-    http("POST","/rest/v1/rpc/submit_entry",{"p_request_id":str(uuid.uuid4()),"p_token":t,"p_pool":"普","p_payload":{"campaign_id":C,"size":"4fen","makeup":"free","xianyu_id":f"{C}_{i}","contact1":"13900002222","receiver_name":"x"}})
+    r=http("POST","/rest/v1/rpc/submit_entry",{"p_request_id":str(uuid.uuid4()),"p_token":t,"p_pool":"普" if i<4 else "钞","p_payload":{"campaign_id":C,"size":"4fen","makeup":"free","xianyu_id":f"{C}_{i}","contact1":"13900002222","receiver_name":"x"}})[1]
+    rc = rc or r
+ok("回执带 demo",rc.get("demo"),True)
 sl=http("POST","/rest/v1/rpc/request_upload",{"p_token":toks[0]})[1]["slots"]; http("POST",f"/storage/v1/object/reference-images/{sl[0]}",b"\xff\xd8\xff\xe0x","image/jpeg")
 http("POST","/rest/v1/rpc/attach_images",{"p_token":toks[0],"p_paths":[sl[0]]})
-ok("演练开始后不能改标记",arpc("set_campaign_demo",{"p_id":C,"p_demo":False}).get("message"),"campaign_started")
-time.sleep(13)
+ok("开始后不能改批次",arpc("upsert_campaign",{"p_id":C,"p_open_at":datetime.now(timezone.utc).isoformat(),"p_window":12,"p_quotas":{"普":{"speed":1,"pick":1,"lottery":1},"钞":{"speed":1,"pick":0,"lottery":1}},"p_demo":False}).get("message"),"campaign_started")
+ok("窗口内不能清空",arpc("purge_demo",{"p_campaign":C}).get("message"),"not_closed")
+while time.time()-T0<45: time.sleep(0.5)
+import threading
+pool2=arpc("admin_pool",{"p_campaign":C,"p_pool":"钞"}); outs={}
+def cw(p,e): outs[p]=arpc("confirm_win",{"p_campaign":C,"p_pool":p,"p_entries":[e],"p_type":"speed"})
+th=[threading.Thread(target=cw,args=("钞",pool2[0]["entry_id"]))]
 pool=arpc("admin_pool",{"p_campaign":C,"p_pool":"普"})
-w=arpc("confirm_win",{"p_campaign":C,"p_pool":"普","p_entries":[pool[0]["entry_id"]],"p_type":"speed"})
+th.append(threading.Thread(target=cw,args=("普",pool[0]["entry_id"]))); [t.start() for t in th]; [t.join() for t in th]
+w=outs["普"]
+ok("两池同时发 DEMO 号不冲突",isinstance(outs["钞"],list) and isinstance(w,list) and outs["钞"][0]["order_id"]!=w[0]["order_id"],True)
 ok("演练手速发 DEMO 号",w[0]["order_id"].startswith("DEMO-"),True)
 arpc("confirm_win",{"p_campaign":C,"p_pool":"普","p_entries":[pool[2]["entry_id"]],"p_type":"pick"})
 arpc("lock_pool",{"p_campaign":C,"p_pool":"普"}); d=arpc("draw",{"p_campaign":C,"p_pool":"普","p_number":"38627"})
 ok("演练开奖 DEMO 号",d["winners"][0]["order_id"].startswith("DEMO-"),True)
 ok("正式订单数没变",sql("select count(*)::int n from public.orders")[0]["n"],n0)
 ok("正式最大编号没变",sql("select max(order_id) m from public.orders")[0]["m"],maxid0)
-ok("查单看到 DEMO 号",http("POST","/rest/v1/rpc/lookup_entry",{"p_token":toks[0]})[1].get("order_id","").startswith("DEMO-"),True)
-r=arpc("purge_demo",{"p_campaign":C}); ok("清空人数",r["purged"],4); ok("待删图",len(r["delete_paths"]),1)
+lk=http("POST","/rest/v1/rpc/lookup_entry",{"p_token":toks[0]})[1]
+ok("查单看到 DEMO 号",str(lk.get("order_id","")).startswith("DEMO-"),True); ok("查单带 demo",lk.get("demo"),True)
+r=arpc("purge_demo",{"p_campaign":C}); ok("清空人数",r["purged"],6)
+ok("清空后再投",http("POST","/rest/v1/rpc/submit_entry",{"p_request_id":str(uuid.uuid4()),"p_token":secrets.token_urlsafe(32),"p_pool":"普","p_payload":{"campaign_id":C,"size":"4fen","makeup":"free","xianyu_id":"late","contact1":"1","receiver_name":"x"}})[1].get("message"),"closed"); ok("待删图",len(r["delete_paths"]),1)
 st,dd=http("DELETE","/storage/v1/object/reference-images",{"prefixes":r["delete_paths"]},bearer=A); ok("图删除",len(dd) if isinstance(dd,list) else dd,1)
 ok("资料全清",sql(f"select count(*)::int n from public.entries where campaign_id='{C}' and payload <> '{{}}'::jsonb")[0]["n"],0)
 ok("非演练批次不能 purge_demo",arpc("purge_demo",{"p_campaign":"1126c"}).get("message"),"not_demo")

@@ -11,7 +11,7 @@
     speed_not_confirmed: '先把手速确认完，才能锁摇号池', pool_locked: '摇号池已经锁定，不能再改',
     pool_not_locked: '先锁定摇号池', invalid_number: '开奖号要正好 5 位数字', already_drawn: '这个池已经开过奖了，号码不一样',
     forbidden: '这个账号不是管理员', campaign_started: '已经有人投递，批次不能再改', invalid_state: '这张单的状态不对',
-    invalid_payload: '提交的内容不对', invalid_quota: '名额格式不对',
+    invalid_payload: '提交的内容不对', invalid_quota: '名额格式不对', not_demo: '这不是演练批次', maintenance: '维护中，暂停收件',
   };
   const say = (el, text, ok) => { el.textContent = text || ''; el.classList.toggle('ok', !!ok); };
   const errText = (e) => { const m = (e && (e.message || e.error_description)) || String(e); return ERR[m] || m; };
@@ -95,8 +95,7 @@
     const openAt = new Date(local + (local.length === 16 ? ':00' : '') + '+08:00').toISOString();
     try {
       await rpc('upsert_campaign', { p_id: $('cId').value.trim(), p_open_at: openAt, p_window: Number($('cWin').value),
-        p_quotas: { '普': q($('qp').value), '钞': q($('qc').value) } });
-      await rpc('set_campaign_demo', { p_id: $('cId').value.trim(), p_demo: $('cDemo').checked });
+        p_quotas: { '普': q($('qp').value), '钞': q($('qc').value) }, p_demo: $('cDemo').checked });
       $('campaignSel').value = $('cId').value.trim(); await loadCampaigns();
     } catch (e) { alertInline($('campaignInfo'), errText(e)); }
   });

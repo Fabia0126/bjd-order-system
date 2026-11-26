@@ -52,7 +52,7 @@ def pay(x, campaign=True):
 
 def tok(): return secrets.token_urlsafe(32)
 
-sql("insert into auth.users (id, email, aud, role) values ('00000000-0000-0000-0000-0000000000a1','admin-test@example.com','authenticated','authenticated') on conflict do nothing;"
+sql("update public.settings set maintenance=false where id=1; insert into auth.users (id, email, aud, role) values ('00000000-0000-0000-0000-0000000000a1','admin-test@example.com','authenticated','authenticated') on conflict do nothing;"
     " insert into public.admins values ('00000000-0000-0000-0000-0000000000a1') on conflict do nothing;"
     " insert into public.admins select id from auth.users where email='luxun-admin-test@example.com' on conflict do nothing;"
     " update public.settings set premium_3x_open = true where id = 1;")
