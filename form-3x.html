@@ -4,13 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BJD送妆小纸条 · 三倍超</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=direct-v1">
     <script src="vendor/supabase-js-2.118.0.js"></script>
     <script src="runtime-config.js"></script>
     <script src="frontend-security.js"></script>
     <script src="bjd-rpc.js"></script>
     <script src="bjd-site.js"></script>
-    <script src="form-rpc.js"></script>
+    <script src="form-rpc.js?v=direct-v1"></script>
 </head>
 <body>
     <div class="container">
@@ -292,6 +292,7 @@
                     <input type="checkbox" name="agreeNotice" id="agreeNotice" required>
                     <span>我已阅读并同意以上注意事项</span>
                 </label>
+                <button type="button" id="previewBtn" class="preview-btn" onclick="previewOrder()">预览小纸条（可选）</button>
             </section>
 
             <!-- 提交按钮 -->
@@ -303,11 +304,11 @@
                 <div class="countdown-display" id="countdownDisplay" style="display:none;">
                     <span id="countdownText"></span>
                 </div>
-                <button type="submit" class="submit-btn" id="submitBtn" disabled>提交小纸条</button>
+                <button type="submit" class="submit-btn" id="submitBtn" disabled>确认投递</button>
             </div>
         </form>
     </div>
 
-    <script src="script-3x.js?v=rpc-v02"></script>
+    <script src="script-3x.js?v=direct-v1"></script>
 </body>
 </html>

@@ -26,6 +26,17 @@ admission. The form shows the timing near the submit button as well as at the to
 A server maintenance flag disables submission and preserves uncertain requests
 for later recovery; database maintenance enforcement remains mandatory.
 
+The optional preview beside the notice agreement only displays and copies text.
+The bottom `确认投递` button stays disabled before opening, then submits the current
+form directly in one click, without a second confirmation. An already-open preview
+closes at opening; it also displays the live timing while visible. Copy and send
+status messages are inline so application dialogs do not pause the countdown.
+Draft fields and the explicit consent choice survive a reload, and are cleared
+after a confirmed successful submission. Public status polling uses 5 seconds
+normally, 3 seconds within 2 minutes of opening, and 1 second during the final
+10 seconds and admission window. Requests do not overlap; local button timing
+does not wait for a new polling response at the opening edge.
+
 Demo campaigns must expose `campaign.demo` in `campaign_status` and a `demo` boolean
 in submission receipts and `lookup_entry`. The frontend marks these records as
 practice rather than formal orders. A `DEMO-` order identifier also provides a
@@ -57,6 +68,7 @@ preview configuration must not be committed or reused for production.
 node --test tests/*.test.cjs
 python3 tests/browser-offline.py
 python3 tests/form-environment-offline.py
+python3 tests/direct-submit-offline.py
 ```
 
 Browser checks require Playwright with Chromium. They intercept every request and

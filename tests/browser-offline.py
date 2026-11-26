@@ -74,10 +74,13 @@ async def main():
                  'contact2':'fictional-two'}.items():
                 await page.locator('[name="'+name+'"]').fill(value)
             await page.locator('#agreeNotice').check()
-            await page.evaluate('handleSubmit({preventDefault(){}})')
+            await page.locator('#previewBtn').click()
             assert await page.locator('.preview-text img').count() == 0
             assert '<img' in await page.locator('.preview-text').inner_text()
-            await page.evaluate('Promise.all([confirmSubmit(),confirmSubmit()])')
+            assert await page.locator('.preview-modal .btn-confirm').count() == 0
+            assert await page.evaluate('window.__calls.filter(x=>x.name === "submit_entry").length') == 0
+            await page.evaluate('closePreview()')
+            await page.evaluate('Promise.all([handleSubmit({preventDefault(){}}),handleSubmit({preventDefault(){}})])')
             calls = await page.evaluate('window.__calls.filter(x=>x.name === "submit_entry")')
             assert len(calls) == 1
             assert len(calls[0]['params']['p_token']) == 43
