@@ -1,9 +1,9 @@
 // Supabase配置
 const SUPABASE_URL = 'https://assqothmzcsusnksdnmm.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFzc3FvdGhtemNzdXNua3Nkbm1tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzMzMwODEsImV4cCI6MjA5MzkwOTA4MX0.2OxbVdQQBANlv5_vmxitzR5CG79FrD3VPSFzX9laF9M';
-const supabaseClient = (typeof supabase !== 'undefined' && supabase.createClient)
-    ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-    : window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const bjdSite = BJDPage.connect(SUPABASE_URL, SUPABASE_ANON_KEY);
+window.bjdSite = bjdSite;
+const supabaseClient = bjdSite.client;
 
 // 价格配置
 const PRICES = {
@@ -53,6 +53,21 @@ const koupeiQty = document.getElementById('koupeiQty');
 const DRAFT_KEY = 'bjd_order_draft';
 const IMG_KEY = 'bjd_order_images';
 let savedImages = [];
+const bjdForm = new BJDForm.Controller(bjdSite, {
+    form,
+    getSavedImages: () => savedImages,
+    onComplete: () => {
+        closePreview();
+        window.currentOrderData = null;
+        try { clearDraft(); localStorage.removeItem(IMG_KEY); } catch {}
+        savedImages = [];
+        renderImagePreview();
+        form.reset();
+        agreeNotice.checked = false;
+        updatePrice();
+        updateConditionalFields();
+    }
+});
 
 function saveDraft() {
     const data = {};
@@ -147,7 +162,6 @@ document.addEventListener('DOMContentLoaded', () => {
     updateConditionalFields();
     updateMakeupHint();
     setupEventListeners();
-    checkNormalStatus();
     startSmartPolling();
     form.addEventListener('input', saveDraft);
     form.addEventListener('change', saveDraft);
@@ -155,192 +169,17 @@ document.addEventListener('DOMContentLoaded', () => {
     if (new URLSearchParams(window.location.search).get('resubmit') === '1') {
         const banner = document.createElement('div');
         banner.style.cssText = 'background:#fff5f5;border:1px solid #f0c0c0;border-radius:12px;padding:14px 18px;margin-bottom:16px;text-align:center;color:#721c24;font-size:14px;';
-        banner.textContent = '这是被拒绝订单的重新投递，已自动填入之前的信息，请修改后重新提交';
+        banner.textContent = '旧改单／重投入口已停用，请联系阿发核验。此处提交会作为新投递处理。';
         form.parentElement.insertBefore(banner, form.querySelector('header')?.nextSibling || form.firstChild);
         window.history.replaceState({}, '', 'form.html');
     }
 });
 
-// 轮询相关
-let pollTimer = null;
-
-function startSmartPolling() {
-    if (pollTimer) clearTimeout(pollTimer);
-    const delay = getPollingDelay();
-    pollTimer = setTimeout(async () => {
-        await checkNormalStatus();
-        startSmartPolling();
-    }, delay);
-}
-
-function getPollingDelay() {
-    // 倒计时最后10秒：1秒（快速同步开放状态）
-    if (!isNormalOpen && normalOpenTime) {
-        const diff = normalOpenTime - new Date();
-        if (diff > 0 && diff <= 10000) return 1000;
-    }
-    // 刚开放后的头10秒：2秒
-    if (isNormalOpen && normalLimit > 0 && normalRemaining > 0 && normalRemaining < normalLimit) return 2000;
-    // 其他时候：10秒（用户会自己刷新）
-    return 10000;
-}
-
-// 倒计时相关
-let countdownInterval = null;
-let normalOpenTime = null;
-let isNormalOpen = true;
-let isPremiumOpen = true;
-let normalLimit = 0;
-let normalRemaining = -1;
-
-// 检查普单开放状态
-async function checkNormalStatus() {
-    try {
-        const { data: settings, error } = await supabaseClient
-            .from('settings')
-            .select('*')
-            .eq('id', 1)
-            .single();
-
-        if (error) throw error;
-
-        const statusText = document.getElementById('normalStatus');
-        const countdownDisplay = document.getElementById('countdownDisplay');
-        const countdownText = document.getElementById('countdownText');
-
-        normalLimit = settings.normal_limit || 0;
-        isPremiumOpen = settings.premium_open !== false;
-
-        // 查剩余名额
-        if (normalLimit > 0) {
-            const { count } = await supabaseClient
-                .from('orders')
-                .select('*', { count: 'exact', head: true })
-                .eq('order_type', '普单')
-                .neq('status', 'rejected');
-            normalRemaining = normalLimit - (count || 0);
-        }
-
-        if (!settings.normal_open) {
-            isNormalOpen = false;
-
-            if (settings.normal_open_time) {
-                normalOpenTime = new Date(settings.normal_open_time);
-
-                if (statusText) {
-                    const limitText = normalLimit > 0 ? `（限${normalLimit}单）` : '';
-                    statusText.textContent = `普单将于 ${normalOpenTime.toLocaleString('zh-CN')} 开放${limitText}，可提前填写信息`;
-                    statusText.classList.add('show');
-                }
-
-                if (!countdownInterval) {
-                    updateCountdown();
-                    countdownInterval = setInterval(updateCountdown, 1000);
-                }
-            } else {
-                if (statusText) {
-                    statusText.textContent = isPremiumOpen ? '普单已满，当前仅接受钞能力单' : '暂停接单';
-                    statusText.classList.add('show');
-                }
-                if (countdownDisplay) {
-                    countdownDisplay.style.display = 'none';
-                }
-            }
-
-            updateSubmitButton();
-        } else {
-            isNormalOpen = true;
-            normalOpenTime = null;
-
-            if (normalLimit > 0 && normalRemaining <= 0) {
-                if (statusText) {
-                    statusText.textContent = isPremiumOpen ? '普单已抢完，当前仅接受钞能力单' : '暂停接单';
-                    statusText.classList.add('show');
-                }
-                updateSubmitButton();
-            } else {
-                if (statusText) {
-                    if (normalLimit > 0 && normalRemaining > 0) {
-                        statusText.textContent = `普单剩余 ${normalRemaining} 个名额`;
-                        statusText.classList.add('show');
-                    } else {
-                        statusText.classList.remove('show');
-                    }
-                }
-                updateSubmitButton();
-            }
-
-            if (countdownDisplay) {
-                countdownDisplay.style.display = 'none';
-            }
-
-            if (countdownInterval) {
-                clearInterval(countdownInterval);
-                countdownInterval = null;
-            }
-        }
-    } catch (error) {
-        // Supabase不可用时静默处理，不影响用户填写
-    }
-}
-
-function updateCountdown() {
-    const countdownDisplay = document.getElementById('countdownDisplay');
-    const countdownText = document.getElementById('countdownText');
-    const selectedType = document.querySelector('input[name="orderType"]:checked').value;
-
-    if (!normalOpenTime || selectedType !== 'normal') {
-        if (countdownDisplay) countdownDisplay.style.display = 'none';
-        return;
-    }
-
-    const now = new Date();
-    const diff = normalOpenTime - now;
-
-    if (diff <= 0) {
-        // 时间到了
-        isNormalOpen = true;
-        if (countdownDisplay) countdownDisplay.style.display = 'none';
-        if (countdownInterval) {
-            clearInterval(countdownInterval);
-            countdownInterval = null;
-        }
-        updateSubmitButton();
-        return;
-    }
-
-    const hours = Math.floor(diff / 3600000);
-    const minutes = Math.floor((diff % 3600000) / 60000);
-    const seconds = Math.floor((diff % 60000) / 1000);
-
-    if (countdownDisplay) countdownDisplay.style.display = 'block';
-    if (countdownText) {
-        const parts = [];
-        if (hours > 0) parts.push(`${hours}时`);
-        parts.push(`${minutes}分`);
-        parts.push(`${seconds}秒`);
-        countdownText.textContent = `距离开放还有 ${parts.join('')}，可先填写信息`;
-    }
-}
-
-function updateSubmitButton() {
-    const selectedType = document.querySelector('input[name="orderType"]:checked').value;
-    const agreed = agreeNotice.checked;
-
-    if (selectedType === 'normal' && !isNormalOpen) {
-        submitBtn.disabled = true;
-        submitBtn.textContent = '等待开放...';
-    } else if (selectedType === 'normal' && normalLimit > 0 && normalRemaining <= 0) {
-        submitBtn.disabled = true;
-        submitBtn.textContent = '普单已抢完';
-    } else if (selectedType === 'premium' && !isPremiumOpen) {
-        submitBtn.disabled = true;
-        submitBtn.textContent = '钞能力单暂停接单';
-    } else {
-        submitBtn.disabled = !agreed;
-        submitBtn.textContent = '提交小纸条';
-    }
-}
+// Public state comes only from the activity RPC. No direct table reads.
+function startSmartPolling() { bjdForm.start(); }
+async function checkNormalStatus() { await bjdForm.refresh(); }
+function updateCountdown() { bjdForm.updateAvailability(); }
+function updateSubmitButton() { bjdForm.updateAvailability(); }
 
 function setupEventListeners() {
     // 尺寸变化
@@ -437,16 +276,7 @@ function loadSavedImages() {
 function renderImagePreview() {
     const preview = document.getElementById('imagePreview');
     if (!preview) return;
-    if (savedImages.length === 0) {
-        preview.innerHTML = '';
-        return;
-    }
-    preview.innerHTML = savedImages.map((img, i) => `
-        <div style="position:relative;display:inline-block;">
-            <img src="${img.data}" style="width:60px;height:60px;object-fit:cover;border-radius:8px;border:1px solid #e8e0eb;">
-            <span onclick="removeImage(${i})" style="position:absolute;top:-6px;right:-6px;width:18px;height:18px;background:#dc3545;color:white;border-radius:50%;font-size:12px;line-height:18px;text-align:center;cursor:pointer;">×</span>
-        </div>
-    `).join('');
+    BJDSecurity.renderImagePreview(preview, savedImages, removeImage);
 }
 
 function removeImage(index) {
@@ -542,6 +372,9 @@ function handleSubmit(e) {
     // 收集表单数据
     const formData = new FormData(form);
     const data = {};
+    try { data.rpcSnapshot = bjdForm.snapshot(); }
+    catch (error) { alert(error.message); return; }
+
 
     // 基本字段
     data.orderType = formData.get('orderType') === 'chao' ? '钞能力单' : '普单';
@@ -644,7 +477,7 @@ function showPreview(data, textVersion) {
             <h2>小纸条预览</h2>
             <p class="preview-note">请确认信息无误后提交</p>
             <div class="preview-text">
-                <pre>${textVersion}</pre>
+                <pre></pre>
             </div>
             <div class="preview-actions">
                 <button class="btn-copy" onclick="copyText()">复制文字版</button>
@@ -653,6 +486,8 @@ function showPreview(data, textVersion) {
             </div>
         </div>
     `;
+
+    BJDSecurity.setText(modal.querySelector('.preview-text pre'), textVersion);
 
     // 添加样式
     const style = document.createElement('style');
@@ -750,180 +585,9 @@ function copyText() {
 }
 
 async function confirmSubmit() {
-    const data = window.currentOrderData;
-    if (!data) {
-        alert('数据错误，请重新填写');
-        closePreview();
-        return;
-    }
-
-    const confirmBtn = document.querySelector('.btn-confirm');
-    const cancelBtn = document.querySelector('.btn-cancel');
-    if (confirmBtn) {
-        confirmBtn.disabled = true;
-        confirmBtn.textContent = '排队中...';
-    }
-    if (cancelBtn) cancelBtn.disabled = true;
-
-    // 随机延迟0-2秒，把并发请求打散
-    await new Promise(r => setTimeout(r, Math.random() * 2000));
-
-    if (confirmBtn) confirmBtn.textContent = '正在提交...';
-
-    // 钞单提交前检查开关
-    if (data.orderType === '钞能力单') {
-        try {
-            const { data: settings } = await supabaseClient
-                .from('settings').select('premium_open').eq('id', 1).single();
-            if (settings && settings.premium_open === false) {
-                alert('钞能力单暂停接单，请稍后再试');
-                if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = '确认提交'; }
-                if (cancelBtn) cancelBtn.disabled = false;
-                closePreview();
-                return;
-            }
-        } catch (e) {}
-    }
-
-    // 普单提交前快速检查库存
-    if (data.orderType === '普单' && normalLimit > 0) {
-        try {
-            const { count } = await supabaseClient
-                .from('orders')
-                .select('*', { count: 'exact', head: true })
-                .eq('order_type', '普单')
-                .neq('status', 'rejected');
-            if (count >= normalLimit) {
-                alert('很抱歉，普单已被抢完啦！');
-                if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = '确认提交'; }
-                if (cancelBtn) cancelBtn.disabled = false;
-                normalRemaining = 0;
-                updateSubmitButton();
-                closePreview();
-                return;
-            }
-        } catch (e) {
-            // 检查失败不阻塞，靠数据库trigger兜底
-        }
-    }
-
-    const orderData = {
-        status: 'pending',
-        order_type: data.orderType,
-        size: data.size,
-        makeup_type: data.makeupType,
-        doll_info: data.dollInfo,
-        attribute: data.attribute,
-        gender: data.gender,
-        color_scheme: data.colorScheme,
-        taboos: data.taboos || [],
-        requirements: data.requirements || [],
-        addons: data.addons || [],
-        free_items: data.freeItems || [],
-        glitter: data.glitter,
-        accessories: data.accessories,
-        xianyu_id: data.xianyuId,
-        receiver_name: data.receiverName,
-        contact1: data.contact1,
-        contact2: data.contact2,
-        shipping: data.shipping,
-        total_price: data.totalPrice
-    };
-
-    try {
-        const fileInput = document.querySelector('input[name="referenceImages"]');
-        const hasNewFiles = fileInput && fileInput.files.length > 0;
-        const hasSavedImages = savedImages.length > 0;
-
-        if (hasNewFiles || hasSavedImages) {
-            if (confirmBtn) confirmBtn.textContent = '正在上传图片...';
-            const imageUrls = [];
-
-            if (hasNewFiles) {
-                for (const file of fileInput.files) {
-                    const ext = file.name.split('.').pop();
-                    const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-                    const { error: uploadError } = await supabaseClient.storage
-                        .from('reference-images')
-                        .upload(fileName, file);
-                    if (!uploadError) {
-                        const { data: urlData } = supabaseClient.storage
-                            .from('reference-images')
-                            .getPublicUrl(fileName);
-                        imageUrls.push(urlData.publicUrl);
-                    }
-                }
-            } else if (hasSavedImages) {
-                for (const img of savedImages) {
-                    const resp = await fetch(img.data);
-                    const blob = await resp.blob();
-                    const ext = img.name.split('.').pop() || 'jpg';
-                    const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-                    const { error: uploadError } = await supabaseClient.storage
-                        .from('reference-images')
-                        .upload(fileName, blob);
-                    if (!uploadError) {
-                        const { data: urlData } = supabaseClient.storage
-                            .from('reference-images')
-                            .getPublicUrl(fileName);
-                        imageUrls.push(urlData.publicUrl);
-                    }
-                }
-            }
-
-            if (imageUrls.length > 0) {
-                orderData.reference_images = imageUrls;
-            }
-        }
-
-        if (confirmBtn) confirmBtn.textContent = '正在提交...';
-
-        const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('提交超时，请检查网络后重试')), 20000)
-        );
-
-        const insertPromise = supabaseClient
-            .from('orders')
-            .insert([orderData])
-            .select();
-
-        const { data: result, error } = await Promise.race([insertPromise, timeoutPromise]);
-
-        if (error) throw error;
-
-        if (!result || result.length === 0) {
-            throw new Error('服务器未返回确认数据，订单可能未成功提交，请刷新后检查');
-        }
-
-        alert('提交成功！\n\n订单已提交，请等待店主审核确认。\n确认后会生成订单编号，届时请凭编号去闲鱼拍万能拍。\n\n您可以在"订单查询"页面用联系方式查看订单状态。');
-
-        closePreview();
-        clearDraft();
-        savedImages = [];
-        try { localStorage.removeItem(IMG_KEY); } catch(e) {}
-        document.getElementById('imagePreview').innerHTML = '';
-
-        document.getElementById('orderForm').reset();
-        document.getElementById('agreeNotice').checked = false;
-        document.getElementById('submitBtn').disabled = true;
-        updatePrice();
-    } catch (error) {
-        console.error('提交失败:', error);
-        const errMsg = error.message || '';
-        if (errMsg.includes('NORMAL_ORDER_FULL') || errMsg.includes('普单已抢完')) {
-            alert('很抱歉，普单已被抢完啦！');
-            normalRemaining = 0;
-            updateSubmitButton();
-            closePreview();
-        } else {
-            alert('提交失败，请稍后重试\n\n错误信息: ' + (errMsg || '网络错误'));
-            if (confirmBtn) {
-                confirmBtn.disabled = false;
-                confirmBtn.textContent = '确认提交';
-            }
-            if (cancelBtn) cancelBtn.disabled = false;
-        }
-    }
+    const snapshot = window.currentOrderData?.rpcSnapshot;
+    if (!snapshot) { alert('请重新核对小纸条。'); return; }
+    await bjdForm.submit(snapshot);
 }
 
 function closePreview() {

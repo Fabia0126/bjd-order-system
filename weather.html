@@ -571,8 +571,9 @@
                 document.getElementById('app').innerHTML = `
                     <div class="loading">
                         <p>天气数据加载失败，请刷新重试</p>
-                        <p style="font-size:12px;color:#ccc;margin-top:8px;">${e.message}</p>
+                        <p id="weatherErrorDetail" style="font-size:12px;color:#ccc;margin-top:8px;"></p>
                     </div>`;
+                document.getElementById('weatherErrorDetail').textContent = String(e.message || '天气服务暂时不可用');
             }
         }
 
