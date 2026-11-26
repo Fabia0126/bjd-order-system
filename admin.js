@@ -1,10 +1,11 @@
-// Supabase配置
-const SUPABASE_URL = 'https://assqothmzcsusnksdnmm.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFzc3FvdGhtemNzdXNua3Nkbm1tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzMzMwODEsImV4cCI6MjA5MzkwOTA4MX0.2OxbVdQQBANlv5_vmxitzR5CG79FrD3VPSFzX9laF9M';
 
-const ADMIN_CFG = window.LOTTERY_CONFIG || { url: SUPABASE_URL, anonKey: SUPABASE_ANON_KEY };
+const ADMIN_CFG = window.BJD_ADMIN_CONFIG;
 let supabaseClient = null;
 try {
+    if (!ADMIN_CFG) {
+        document.addEventListener('DOMContentLoaded', () => { const e = document.getElementById('loginError'); e.textContent = '这个地址没有配置数据库，已停止连接'; e.style.display = 'block'; });
+        throw new Error('no config');
+    }
     if (typeof supabase !== 'undefined' && supabase.createClient) {
         supabaseClient = supabase.createClient(ADMIN_CFG.url, ADMIN_CFG.anonKey);
     } else if (typeof window.supabase !== 'undefined') {
@@ -13,7 +14,7 @@ try {
         alert('Supabase库未加载！请刷新页面');
     }
 } catch (e) {
-    alert('Supabase初始化失败: ' + e.message);
+    if (ADMIN_CFG) alert('Supabase初始化失败: ' + e.message);
 }
 
 // 订单状态
@@ -54,6 +55,7 @@ let consecutiveFetchFails = 0;
 
 // 获取订单
 async function fetchOrders() {
+    const gen = authGen;
     try {
         const { data, error } = await supabaseClient
             .from('orders')
@@ -61,6 +63,7 @@ async function fetchOrders() {
             .order('submit_time', { ascending: false });
 
         if (error) throw error;
+        if (gen !== authGen) return;
         rawOrders = data || [];
         allOrders = rawOrders.map(escOrder);
         renderOrders(currentFilter);
@@ -695,9 +698,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ===== 管理员登录（Supabase Auth），登录且是管理员才加载订单 =====
 let pollTimer = null;
+let authGen = 0;    // 每次退出 +1，迟到的旧结果直接丢掉
 async function adminBoot() {
     const overlay = document.getElementById('loginOverlay');
     const err = document.getElementById('loginError');
+    if (!ADMIN_CFG || !supabaseClient) { overlay.style.display = 'flex'; err.textContent = '这个地址没有配置数据库，已停止连接'; err.style.display = 'block'; return; }
     try {
         const { data: { session } } = await supabaseClient.auth.getSession();
         if (session) {
@@ -727,8 +732,12 @@ async function adminLogin() {
     adminBoot();
 }
 async function adminLogout() {
-    if (pollTimer) clearInterval(pollTimer);
+    authGen++;
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
     allOrders = []; rawOrders = [];
+    ['orderList', 'orderDetail', 'orderActions'].forEach(id => { const n = document.getElementById(id); if (n) n.replaceChildren(); });
+    try { closeModal(); } catch (e) {}
+    document.getElementById('loginOverlay').style.display = 'flex';
     try { await supabaseClient.auth.signOut(); } finally { location.reload(); }
 }
 

@@ -1,6 +1,8 @@
 // 开单开奖台：只走管理员 RPC，所有页面文字用 textContent，不拼 HTML
 (() => {
-  const cfg = window.LOTTERY_CONFIG;
+  const cfg = window.BJD_ADMIN_CONFIG;
+  if (!cfg) { document.addEventListener('DOMContentLoaded', () => {}); document.getElementById('login').hidden = false;
+    document.getElementById('loginMsg').textContent = '这个地址没有配置数据库，已停止连接'; document.getElementById('loginForm').querySelector('button').disabled = true; return; }
   const linkType = (new URLSearchParams(location.hash.slice(1))).get('type');   // 邀请/找回密码链接，客户端处理前先记下
   const sb = window.supabase.createClient(cfg.url, cfg.anonKey);
   const $ = (id) => document.getElementById(id);
