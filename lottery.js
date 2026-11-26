@@ -25,7 +25,7 @@
     });
   }
 
-  let campaigns = [], cur = null;
+  let campaigns = [], cur = null, gen = 0;
 
   async function boot() {
     const { data: { session } } = await sb.auth.getSession();
@@ -56,7 +56,7 @@
     history.replaceState(null, '', location.pathname);
     $('setpw').hidden = true; boot();
   });
-  $('logout').onclick = async () => { await sb.auth.signOut(); location.reload(); };
+  $('logout').onclick = async () => { $('main').hidden = true; $('pools').replaceChildren(); $('triple').replaceChildren(); try { await sb.auth.signOut(); } finally { location.reload(); } };
 
   async function loadCampaigns() {
     const { data, error } = await sb.from('campaigns').select('*').order('open_at', { ascending: false });
@@ -84,24 +84,29 @@
   function alertInline(node, text) { node.textContent = text; }
 
   async function render() {
+    const my = ++gen;
     cur = campaigns.find(c => c.id === $('campaignSel').value) || campaigns[0] || null;
+    const c = cur;
     $('pools').replaceChildren();
     if (!cur) { $('campaignInfo').textContent = '还没有批次，先在下面新建一个'; await renderTriple(); return; }
     const close = new Date(new Date(cur.open_at).getTime() + cur.window_seconds * 1000);
     $('campaignInfo').textContent = `开放 ${fmt(cur.open_at)} → 关闭 ${fmt(close)}（${cur.window_seconds} 秒）` +
       (cur.lottery_number ? ` · 开奖号 ${cur.lottery_number}` : '');
-    for (const pool of ['普', '钞']) $('pools').append(await poolCard(pool));
+    const cards = [];
+    for (const pool of ['普', '钞']) cards.push(await poolCard(c, pool));
+    if (my !== gen) return;                       // 期间切了批次或又刷新过，丢掉这次结果
+    $('pools').replaceChildren(...cards);
     await renderTriple();
   }
 
-  async function poolCard(pool) {
-    const q = cur.quotas[pool];
+  async function poolCard(c, pool) {
+    const cid = c.id, q = c.quotas[pool];
     const card = el('div', { className: 'card' });
     const msg = el('p', { className: 'msg', role: 'status' });
     let rows = [], lock = null;
     try {
-      rows = await rpc('admin_pool', { p_campaign: cur.id, p_pool: pool });
-      const { data } = await sb.from('lottery_pools').select('*').eq('campaign_id', cur.id).eq('pool', pool).maybeSingle();
+      rows = await rpc('admin_pool', { p_campaign: cid, p_pool: pool });
+      const { data } = await sb.from('lottery_pools').select('*').eq('campaign_id', cid).eq('pool', pool).maybeSingle();
       lock = data;
     } catch (e) { say(msg, errText(e)); }
     const speedDone = rows.filter(r => r.win_type === 'speed').length;
@@ -142,36 +147,36 @@
     bSpeed.onclick = async () => {
       const top = rows.slice(0, q.speed).filter(r => !r.win_type);
       if (!(await ask(`确认 ${pool}单手速：${top.map(r => r.xianyu_id).join('、')}？确认后立刻生成正式编号。`))) return;
-      try { await rpc('confirm_win', { p_campaign: cur.id, p_pool: pool, p_entries: top.map(r => r.entry_id), p_type: 'speed' }); await render(); }
+      try { await rpc('confirm_win', { p_campaign: cid, p_pool: pool, p_entries: top.map(r => r.entry_id), p_type: 'speed' }); await render(); }
       catch (e) { say(msg, errText(e)); }
     };
     bPick.onclick = async () => {
       if (!picked || !(await ask(`确认 ${pool}单选抽：${picked.xianyu_id}？`))) return;
-      try { await rpc('confirm_win', { p_campaign: cur.id, p_pool: pool, p_entries: [picked.entry_id], p_type: 'pick' }); await render(); }
+      try { await rpc('confirm_win', { p_campaign: cid, p_pool: pool, p_entries: [picked.entry_id], p_type: 'pick' }); await render(); }
       catch (e) { say(msg, errText(e)); }
     };
     bLock.onclick = async () => {
       if (!(await ask(`锁定 ${pool}单摇号池？锁定后名单和顺序不能再改，选抽也不能再加。`))) return;
-      try { await rpc('lock_pool', { p_campaign: cur.id, p_pool: pool }); await render(); }
+      try { await rpc('lock_pool', { p_campaign: cid, p_pool: pool }); await render(); }
       catch (e) { say(msg, errText(e)); }
     };
 
-    if (lock) card.append(sheet(pool, rows, lock), drawBox(pool, lock));
+    if (lock) card.append(sheet(cid, pool, rows, lock), drawBox(cid, pool, lock));
     return card;
   }
 
   // 公布用名单：只有序号和闲鱼 ID
-  function sheet(pool, rows, lock) {
+  function sheet(cid, pool, rows, lock) {
     const list = rows.filter(r => r.lottery_pos).sort((a, b) => a.lottery_pos - b.lottery_pos);
     const ol = el('ol');
     list.forEach(r => ol.append(el('li', { textContent: r.xianyu_id })));
     return el('div', { className: 'sheet' },
-      el('h3', { textContent: `${cur.id} · ${pool}单摇号池（共 ${list.length} 人）` }),
+      el('h3', { textContent: `${cid} · ${pool}单摇号池（共 ${list.length} 人）` }),
       el('div', { className: 'meta', textContent: `锁定时间 ${fmt(lock.locked_at)} · 开奖用当晚排列5 · 步长＝人数÷名额取整，起点＝开奖号÷人数的余数＋1` }),
       ol);
   }
 
-  function drawBox(pool, lock) {
+  function drawBox(cid, pool, lock) {
     const box = el('div', { className: 'drawbox' });
     const msg = el('p', { className: 'msg', role: 'status' });
     if (lock.drawn_at) {
@@ -184,19 +189,26 @@
     const bPrev = el('button', { type: 'button', className: 'ghost', textContent: '④ 预览结果' });
     const bDraw = el('button', { type: 'button', textContent: '⑤ 确认开奖', disabled: true });
     const out = el('p');
-    let previewed = null;
-    inp.oninput = () => { bDraw.disabled = true; previewed = null; out.textContent = ''; };
+    let previewed = null, seq = 0;
+    inp.oninput = () => { seq++; bDraw.disabled = true; previewed = null; out.textContent = ''; };
     bPrev.onclick = async () => {
+      const num = inp.value.trim(), mine = ++seq;
+      bDraw.disabled = true; previewed = null; out.textContent = '计算中…';
       try {
-        const d = await rpc('draw_preview', { p_campaign: cur.id, p_pool: pool, p_number: inp.value.trim() });
-        previewed = inp.value.trim();
+        const d = await rpc('draw_preview', { p_campaign: cid, p_pool: pool, p_number: num });
+        if (mine !== seq || inp.value.trim() !== num) return;   // 期间改过号码，作废
+        previewed = num;
         out.textContent = `人数 ${d.m}，名额 ${d.n}` + (d.n ? `，步长 ${d.k}，起点 ${d.s} → 中签：` + d.winners.map(w => `${w.pos} 号 ${w.xianyu_id}`).join('、') : '');
         bDraw.disabled = false; say(msg, '');
       } catch (e) { say(msg, errText(e)); }
     };
     bDraw.onclick = async () => {
-      if (!previewed || !(await ask(`用 ${previewed} 正式开奖？开了就不能换号码。`))) return;
-      try { await rpc('draw', { p_campaign: cur.id, p_pool: pool, p_number: previewed }); await render(); }
+      const num = previewed;
+      if (!num || inp.value.trim() !== num) return say(msg, '号码和预览的不一样，请重新预览');
+      if (!(await ask(`用 ${num} 正式开奖？开了就不能换号码。`))) return;
+      if (previewed !== num || inp.value.trim() !== num) return say(msg, '号码和预览的不一样，请重新预览');
+      bDraw.disabled = true;
+      try { await rpc('draw', { p_campaign: cid, p_pool: pool, p_number: num }); await render(); }
       catch (e) { say(msg, errText(e)); }
     };
     box.append(el('div', { className: 'row' }, el('label', { htmlFor: inp.id, textContent: '开奖号' }), inp, bPrev, bDraw), out, msg);
@@ -226,18 +238,22 @@
   }
 
   $('purge').onclick = async () => {
-    if (!cur || !(await ask(`清理批次 ${cur.id} 所有未中签的资料和图片？不可撤销。`))) return;
+    const cid = cur && cur.id;
+    if (!cid || !(await ask(`清理批次 ${cid} 所有未中签的资料和图片？不可撤销。`))) return;
     try {
-      const r = await rpc('purge_not_selected', { p_campaign: cur.id });
+      const r = await rpc('purge_not_selected', { p_campaign: cid });
       const paths = r.delete_paths || [];
+      let removed = 0;
       for (let i = 0; i < paths.length; i += 50) {
-        const { error } = await sb.storage.from('reference-images').remove(paths.slice(i, i + 50));
+        const { data, error } = await sb.storage.from('reference-images').remove(paths.slice(i, i + 50));
         if (error) throw error;
+        removed += (data || []).length;
       }
-      say($('purgeMsg'), `已清理 ${r.purged} 人，删除图片 ${paths.length} 张`, true);
+      if (removed < paths.length) say($('purgeMsg'), `资料已清理 ${r.purged} 人；图片应删 ${paths.length} 张，实际删掉 ${removed} 张，剩下的再点一次清理`);
+      else say($('purgeMsg'), `已清理 ${r.purged} 人，删除图片 ${removed} 张`, true);
       render();
     } catch (e) { say($('purgeMsg'), errText(e)); }
   };
 
-  boot();
+  boot().catch((e) => { $('main').hidden = true; $('login').hidden = false; say($('loginMsg'), '加载失败：' + errText(e) + '，请刷新'); });
 })();
