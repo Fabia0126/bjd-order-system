@@ -26,6 +26,12 @@ admission. The form shows the timing near the submit button as well as at the to
 A server maintenance flag disables submission and preserves uncertain requests
 for later recovery; database maintenance enforcement remains mandatory.
 
+Demo campaigns must expose `campaign.demo` in `campaign_status` and a `demo` boolean
+in submission receipts and `lookup_entry`. The frontend marks these records as
+practice rather than formal orders. A `DEMO-` order identifier also provides a
+fallback label for completed demo records. Without the server flags, a pre-draw
+demo cannot be reliably distinguished; campaign-name guesses are not used.
+
 `frontend-security.js` provides DOM image previews, HTML text / quoted-attribute
 escaping, fixed upload-slot validation, and CSV formula protection. HTML escaping
 does not make interpolated JavaScript or arbitrary URLs safe. Prefer DOM listeners

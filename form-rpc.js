@@ -116,6 +116,7 @@
                     else message = '本次收件已结束，已投递者请凭查询凭据查看进度。';
                 }
             } else if (!this.status) message = '活动状态暂不可用，可先填写资料，稍后再试。';
+            if (pool !== '三倍钞' && this.status?.campaign?.demo === true) message = '【演练批次，不参与正式开单】' + message;
             const environmentReady = this.site.rpc.canPrepareSubmission();
             const maintenance = this.status?.maintenance === true;
             if (maintenance) message = BJDRpc.ERROR_TEXT.maintenance;
@@ -197,11 +198,12 @@
         showReceipt(receipt, restored = false) {
             this.confirmed = receipt;
             this.panel.hidden = false;
-            this.panel.replaceChildren(element('h2', restored ? '本设备保存的最近回执' : '服务器已收件'));
+            const demo = receipt.demo === true || String(receipt.order_id || '').startsWith('DEMO-');
+            this.panel.replaceChildren(element('h2', demo ? '演练投递回执 · 非正式订单' : (restored ? '本设备保存的最近回执' : '服务器已收件')));
             const states = { received: '已收到投递，请等待开奖。收件成功不等于中签。',
                 reviewing: '三倍钞等待审核；暂未生成正式编号。', won: '原投递已中签／审核通过，请到查询页查看正式编号。',
                 not_selected: '本次未中签。', rejected: '本次未通过审核。' };
-            this.panel.append(element('p', states[receipt.status] || '请到查询页查看最新进度。'));
+            this.panel.append(element('p', demo ? '这是演练记录，不参与正式开单，不生成BJD正式编号。' : (states[receipt.status] || '请到查询页查看最新进度。')));
             this.panel.append(element('p', '服务器计价：¥' + receipt.price));
             const token = element('input');
             token.readOnly = true; token.value = receipt.token; token.setAttribute('aria-label', '本人查询凭据');

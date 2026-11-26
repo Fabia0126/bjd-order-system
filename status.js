@@ -36,15 +36,17 @@
     }
     function render(entry) {
         if (!entry || !Object.hasOwn(statuses, entry.status)) throw new Error('invalid_response');
+        const demo = entry.demo === true || String(entry.order_id || '').startsWith('DEMO-');
         const card = node('section', undefined, 'order-result');
         const heading = node('div', undefined, 'result-header');
-        heading.append(node('span', entry.order_id || '投递回执 · 尚无正式编号', 'result-id'),
-            node('span', statuses[entry.status], 'result-status'));
+        heading.append(node('span', entry.order_id || (demo ? '演练回执 · 非正式订单' : '投递回执 · 尚无正式编号'), 'result-id'),
+            node('span', (demo ? '演练 · ' : '') + statuses[entry.status], 'result-status'));
         card.append(heading);
+        if (demo) card.append(node('p', '这是演练记录，不参与正式开单，不生成BJD正式编号。'));
         line(card, '类别', entry.pool);
         line(card, '服务器收件时间', time(entry.received_at));
         line(card, '服务器计价', Number.isFinite(entry.price) ? '¥' + entry.price : '待确认');
-        if (entry.status === 'won' && Object.hasOwn(orderStatuses, entry.order_status)) {
+        if (!demo && entry.status === 'won' && Object.hasOwn(orderStatuses, entry.order_status)) {
             line(card, '订单进度', orderStatuses[entry.order_status]);
         }
         const p = entry.payload;
@@ -57,7 +59,7 @@
         if (entry.status === 'received') card.append(node('p', '收件成功不等于中签，请等待开奖。'));
         if (entry.status === 'not_selected') card.append(node('p', '本次未中签；资料保留情况以活动公告和实际清理状态为准。'));
         if (entry.status === 'won' && entry.order_id) {
-            const copy = node('button', '复制正式编号', 'copy-btn');
+            const copy = node('button', demo ? '复制演练编号' : '复制正式编号', 'copy-btn');
             copy.type = 'button';
             copy.addEventListener('click', async () => {
                 try { await navigator.clipboard.writeText(String(entry.order_id)); copy.textContent = '已复制'; }
