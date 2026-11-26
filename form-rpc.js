@@ -25,6 +25,7 @@
             this.confirmed = null;
             this.panel = element('section', undefined, 'form-section');
             this.panel.id = 'submissionReceipt';
+            this.panel.classList.add('receipt-card');
             this.panel.hidden = true;
             this.form.after(this.panel);
         }
@@ -230,7 +231,7 @@
                 this.validateImages(files);
                 if (files.length) {
                     await this.uploadImages(receipt, files);
-                    this.imageNote.textContent = '参考图已绑定。';
+                    this.markImagesBound(files.length);
                 } else if (recover) {
                     this.imageNote.textContent = '原文字投递已恢复；如需补图，请在原收件起30分钟内选择参考图并点击补传。';
                 } else {
@@ -259,40 +260,79 @@
         showReceipt(receipt, restored = false) {
             this.confirmed = receipt;
             this.panel.hidden = false;
-            const demo = receipt.demo === true || String(receipt.order_id || '').startsWith('DEMO-');
-            this.panel.replaceChildren(element('h2', demo ? '演练投递回执 · 非正式订单' : (restored ? '本设备保存的最近回执' : '服务器已收件')));
-            const states = { received: '已收到投递，请等待开奖。收件成功不等于中签。',
-                reviewing: '三倍钞等待审核；暂未生成正式编号。', won: '原投递已中签／审核通过，请到查询页查看正式编号。',
-                not_selected: '本次未中签。', rejected: '本次未通过审核。' };
-            this.panel.append(element('p', demo ? '这是演练记录，不参与正式开单，不生成BJD正式编号。' : (states[receipt.status] || '请到查询页查看最新进度。')));
-            this.panel.append(element('p', '服务器计价：¥' + receipt.price));
-            const token = element('input');
-            token.readOnly = true; token.value = receipt.token; token.setAttribute('aria-label', '本人查询凭据');
-            token.style.cssText = 'width:100%;font-family:monospace;';
-            const copy = element('button', '复制并保存查询凭据');
-            copy.type = 'button';
+            this.panel.replaceChildren();
+            const demo = BJDReceiptUI.isDemo(receipt);
+            const header = element('div', undefined, 'receipt-header');
+            const heading = element('div', undefined, 'receipt-heading');
+            heading.append(element('p', '投递回执', 'receipt-eyebrow'),
+                element('h2', demo ? '演练投递回执' : (restored ? '本机保存的回执' : '小纸条已收到'), 'receipt-title'),
+                element('p', restored ? '这是本机保存的记录，最新进度请前往查询页。' : '请先保存查询凭据，再离开这个页面。', 'receipt-subtitle'));
+            header.append(heading, BJDReceiptUI.badges(receipt));
+            const states = { received: '收件成功不等于中签，请等待开奖。', reviewing: '小纸条已收到，等待阿发审核。',
+                won: '已中签或审核通过，可在查询页查看正式编号与进度。', not_selected: '本次未中签。', rejected: '本次未通过审核。' };
+            this.panel.append(header, element('p', demo ? '这是演练记录，不参与正式开单，不生成BJD正式编号。' : (states[receipt.status] || '请前往查询页查看进度。'), 'receipt-explanation'));
+            const price = element('div', undefined, 'receipt-summary');
+            price.append(element('span', '本次计价'), element('strong', Number.isFinite(receipt.price) ? '¥' + receipt.price : '待确认'));
+            this.panel.append(price);
+
+            const credential = element('div', undefined, 'credential-box');
+            const label = element('label', '本人查询凭据', 'credential-label');
+            const token = element('textarea', undefined, 'credential-code');
+            token.readOnly = true; token.value = receipt.token; token.rows = 3; token.spellcheck = false;
+            token.setAttribute('aria-label', '本人查询凭据'); token.setAttribute('autocapitalize', 'none');
+            label.append(token);
+            const copy = element('button', '复制凭据', 'receipt-button receipt-button-primary credential-copy'); copy.type = 'button';
+            const feedback = element('p', '', 'copy-feedback'); feedback.setAttribute('role', 'status');
             copy.addEventListener('click', async () => {
-                try { await navigator.clipboard.writeText(receipt.token); copy.textContent = '已复制，请仅本人保存'; }
-                catch { token.focus(); token.select(); copy.textContent = '请长按凭据复制保存'; }
+                try { await navigator.clipboard.writeText(receipt.token); feedback.textContent = '已复制，请保存到仅本人可见的地方。'; }
+                catch { token.focus(); token.select(); feedback.textContent = '请长按凭据，复制或截图保存。'; }
             });
-            const link = element('a', '凭查询凭据查看进度'); link.href = 'status.html';
-            this.imageNote = element('p', restored ? '这是本机保存的收件回执，最新进度请前往查询页。' : '正在处理参考图…');
-            const images = element('input'); images.type = 'file'; images.multiple = true;
+            credential.append(label, element('p', '这是查询订单的唯一凭据，请立即截图或复制保存。丢失无法找回，手机号不能查单。', 'credential-warning'), copy, feedback);
+            const actions = element('div', undefined, 'receipt-actions');
+            const link = element('a', '查看订单进度', 'receipt-button receipt-button-secondary'); link.href = 'status.html'; actions.append(link);
+            this.panel.append(credential, actions);
+
+            const uploads = element('section', undefined, 'upload-section');
+            uploads.append(element('h3', '补传参考图'), element('p', '最多6张 · 单张5MB以内 · JPEG / PNG / WebP；收件后30分钟内可补传，绑定后不可更换。', 'upload-help'));
+            const images = element('input'); images.type = 'file'; images.multiple = true; images.hidden = true;
             images.accept = 'image/jpeg,image/png,image/webp'; images.setAttribute('aria-label', '选择待补传参考图');
-            const supplement = element('button', '补传参考图'); supplement.type = 'button';
+            const selection = element('p', '尚未选择参考图', 'upload-selection');
+            const choose = element('button', '选择参考图', 'receipt-button receipt-button-secondary'); choose.type = 'button';
+            choose.addEventListener('click', () => images.click());
+            images.addEventListener('change', () => { selection.textContent = images.files.length ? '已选择 ' + images.files.length + ' 张，确认后点击补传。' : '尚未选择参考图'; });
+            const supplement = element('button', '补传参考图', 'receipt-button receipt-button-primary'); supplement.type = 'button';
+            this.imageNote = element('p', restored ? '绑定状态以最近一次成功回执为准。' : '正在核对参考图…', 'upload-status');
+            this.imageNote.setAttribute('role', 'status');
+            this.imageChoose = choose; this.imageSend = supplement; this.imageSelection = selection; this.imagesBound = false;
             supplement.addEventListener('click', async () => {
-                if (this.busy) return;
-                this.busy = true; supplement.disabled = true;
+                if (this.busy || this.imagesBound) return;
+                this.busy = true; supplement.disabled = true; choose.disabled = true; supplement.textContent = '正在补传…';
                 try {
                     const files = Array.from(images.files);
-                    if (!files.length) throw new Error('请先选择参考图。');
+                    if (!files.length) { this.imageNote.textContent = '请先选择参考图。'; return; }
                     this.validateImages(files);
                     await this.uploadImages(receipt, files);
-                    this.imageNote.textContent = '参考图已绑定。';
-                } catch (error) { this.imageNote.textContent = error.safeCode ? error.message : '补图未确认，请保留原文件与回执后重试。'; }
-                finally { this.busy = false; supplement.disabled = false; this.updateAvailability(); }
+                    this.markImagesBound(files.length);
+                } catch (error) { this.imageNote.textContent = error.safeCode ? error.message : '补图未确认，请保留原图与回执，稍后重试。'; }
+                finally {
+                    this.busy = false; supplement.disabled = this.imagesBound; choose.disabled = this.imagesBound;
+                    supplement.textContent = this.imagesBound ? '已完成绑定' : '补传参考图'; this.updateAvailability();
+                }
             });
-            this.panel.append(token, copy, element('p', '凭据仅供本人保存，不放进公开名单。'), link, this.imageNote, images, supplement);
+            const controls = element('div', undefined, 'upload-controls'); controls.append(choose, supplement);
+            uploads.append(selection, controls, this.imageNote, images); this.panel.append(uploads);
+            try {
+                const manifest = JSON.parse(localStorage.getItem('bjd.image-manifest.v1.' + this.site.project + '.' + receipt.requestId) || 'null');
+                if (manifest?.attached && Array.isArray(manifest.paths)) this.markImagesBound(manifest.paths.length);
+            } catch { /* No verified local image count is available. */ }
+        }
+
+        markImagesBound(count) {
+            this.imagesBound = true;
+            this.imageNote.textContent = '参考图已绑定 ' + count + ' 张。';
+            this.imageNote.classList.add('is-bound');
+            this.imageSelection.textContent = '参考图已保存，无需重复上传。';
+            this.imageChoose.disabled = true; this.imageSend.disabled = true; this.imageSend.textContent = '已完成绑定';
         }
 
         async uploadImages(receipt, files) {

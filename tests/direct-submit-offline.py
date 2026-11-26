@@ -70,7 +70,7 @@ async def main():
             assert '正在提交' in await page.locator('#submitBtn').inner_text()
             await page.evaluate('handleSubmit({preventDefault(){}})')
             await page.wait_for_function('window.__calls.filter(x=>x.name==="submit_entry").length===1 && !bjdForm.busy')
-            await page.wait_for_selector('#submissionReceipt input[readonly]')
+            await page.wait_for_selector('#submissionReceipt textarea[readonly]')
             assert await page.locator('.preview-modal').count()==0
             assert await page.evaluate('window.__calls.filter(x=>x.name==="submit_entry").length')==1
             checks.append(form+': preview never submits; one main click sends once without confirmation')
@@ -94,7 +94,7 @@ async def main():
         assert await page.evaluate('window.__calls.filter(x=>x.name==="submit_entry").length')==0
         await page.locator('#submitBtn').click()
         await page.wait_for_function('window.__calls.filter(x=>x.name==="submit_entry").length===1 && !bjdForm.busy')
-        await page.wait_for_selector('#submissionReceipt input[readonly]')
+        await page.wait_for_selector('#submissionReceipt textarea[readonly]')
         checks.append('opening edge closes preview and enables direct submit locally without refreshing')
 
         cadence=await page.evaluate('''() => {

@@ -4,181 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>订单查询 - BJD送妆</title>
-    <link rel="stylesheet" href="style.css?v=2">
+    <link rel="stylesheet" href="style.css?v=cards-v1">
     <script src="vendor/supabase-js-2.118.0.js"></script>
-    <style>
-        .search-section {
-            background: white;
-            border-radius: 16px;
-            padding: 24px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-        }
-        .search-section h2 {
-            font-size: 18px;
-            color: #d485a8;
-            margin-bottom: 16px;
-            text-align: center;
-        }
-        .search-input {
-            width: 100%;
-            padding: 14px 16px;
-            border: 2px solid #e8e0eb;
-            border-radius: 12px;
-            font-size: 16px;
-            margin-bottom: 12px;
-        }
-        .search-input:focus {
-            outline: none;
-            border-color: #d485a8;
-        }
-        .search-btn {
-            width: 100%;
-            padding: 14px;
-            background: linear-gradient(135deg, #d485a8 0%, #c08db8 100%);
-            color: white;
-            border: none;
-            border-radius: 12px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-        }
-        .search-hint {
-            text-align: center;
-            color: #888;
-            font-size: 13px;
-            margin-top: 12px;
-        }
-        .result-section {
-            display: none;
-        }
-        .result-section.show {
-            display: block;
-        }
-        .order-result {
-            background: white;
-            border-radius: 16px;
-            padding: 24px;
-            margin-bottom: 16px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-        }
-        .result-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 16px;
-            padding-bottom: 16px;
-            border-bottom: 2px solid #f5f0ff;
-        }
-        .result-id {
-            font-size: 18px;
-            font-weight: 600;
-            color: #333;
-        }
-        .result-status {
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-size: 14px;
-            font-weight: 500;
-        }
-        .status-pending { background: #fff3cd; color: #856404; }
-        .status-approved { background: #d4edda; color: #155724; }
-        .status-working { background: #cce5ff; color: #004085; }
-        .status-packing { background: #e2d5f1; color: #5a3d8a; }
-        .status-completed { background: #d1e7dd; color: #0f5132; }
-        .status-rejected { background: #f8d7da; color: #721c24; }
-        .result-info {
-            margin-bottom: 16px;
-        }
-        .info-row {
-            display: flex;
-            padding: 8px 0;
-            border-bottom: 1px solid #f5f5f5;
-        }
-        .info-label {
-            width: 100px;
-            color: #888;
-            font-size: 14px;
-        }
-        .info-value {
-            flex: 1;
-            color: #333;
-            font-size: 14px;
-        }
-        .receipt-box {
-            background: #f8f5fa;
-            border-radius: 12px;
-            padding: 16px;
-            margin-top: 16px;
-        }
-        .receipt-box h3 {
-            font-size: 14px;
-            color: #d485a8;
-            margin-bottom: 12px;
-        }
-        .receipt-text {
-            white-space: pre-wrap;
-            font-family: inherit;
-            font-size: 13px;
-            line-height: 1.8;
-            color: #333;
-        }
-        .copy-btn {
-            width: 100%;
-            padding: 12px;
-            background: #f5f0ff;
-            color: #d485a8;
-            border: none;
-            border-radius: 8px;
-            font-size: 14px;
-            cursor: pointer;
-            margin-top: 12px;
-        }
-        .no-result {
-            background: white;
-            border-radius: 16px;
-            padding: 40px 24px;
-            text-align: center;
-            color: #888;
-        }
-        .back-link {
-            display: block;
-            text-align: center;
-            color: #d485a8;
-            text-decoration: none;
-            margin-top: 20px;
-            font-size: 14px;
-        }
-        .reject-reason-box {
-            background: #fff5f5;
-            border: 1px solid #f0c0c0;
-            border-radius: 10px;
-            padding: 14px 16px;
-            margin-top: 12px;
-        }
-        .reject-reason-box .reason-label {
-            font-size: 13px;
-            color: #999;
-            margin-bottom: 6px;
-        }
-        .reject-reason-box .reason-text {
-            font-size: 14px;
-            color: #721c24;
-            line-height: 1.6;
-        }
-        .resubmit-btn {
-            width: 100%;
-            padding: 14px;
-            background: linear-gradient(135deg, #d485a8 0%, #c08db8 100%);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-size: 15px;
-            font-weight: 500;
-            cursor: pointer;
-            margin-top: 12px;
-        }
-    </style>
+    <link rel="stylesheet" href="receipt-ui.css?v=cards-v1">
 </head>
 <body>
     <div class="container">
@@ -187,11 +15,19 @@
             <p class="subtitle">凭投递成功后保存的查询凭据查看本人的进度</p>
         </header>
 
+        <section id="localReceipts" class="receipt-card local-records" hidden>
+            <p class="receipt-eyebrow">本机留存</p>
+            <h2>本机投递记录</h2>
+            <p class="search-hint">点一条记录查看最新进度。这里仅显示本浏览器保存的记录，徽章为最近已知状态。</p>
+            <div id="savedReceipts" class="record-list"></div>
+        </section>
+
         <div class="search-section">
+            <p class="receipt-eyebrow">投递进度</p>
             <h2>查询我的订单</h2>
-            <select id="savedReceipts" aria-label="选择本设备保存的投递" hidden><option value="">选择本设备保存的投递</option></select>
+            <label class="visually-hidden" for="searchInput">查询凭据</label>
             <input type="text" class="search-input" id="searchInput" placeholder="粘贴43位查询凭据" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="43">
-            <button class="search-btn" id="queryButton" type="button">查询</button>
+            <button class="search-btn" id="queryButton" type="button">查询订单</button>
             <p class="search-hint">查询凭据仅供本人保存；旧订单请联系阿发核验。</p>
         </div>
 
@@ -199,19 +35,20 @@
             <!-- 动态填充 -->
         </div>
 
-        <a href="weather.html" style="display:block;text-align:center;background:linear-gradient(135deg,#87ceeb 0%,#f0e68c 100%);color:#5a4a2a;padding:14px;border-radius:12px;text-decoration:none;font-size:15px;font-weight:500;margin-bottom:16px;box-shadow:0 2px 10px rgba(0,0,0,0.05);">☀️ 查看新昌晴天日历 — 工期按晴天计算</a>
+        <a href="weather.html" class="calendar-link">☀️ 查看新昌晴天日历 — 工期按晴天计算</a>
         <a href="index.html" class="back-link">← 返回首页</a>
     </div>
 
     <script src="runtime-config.js"></script>
     <script src="frontend-security.js"></script>
-    <script src="bjd-rpc.js"></script>
+    <script src="bjd-rpc.js?v=cards-v1"></script>
     <script src="bjd-site.js"></script>
     <script>
         const SUPABASE_URL = 'https://assqothmzcsusnksdnmm.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFzc3FvdGhtemNzdXNua3Nkbm1tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzMzMwODEsImV4cCI6MjA5MzkwOTA4MX0.2OxbVdQQBANlv5_vmxitzR5CG79FrD3VPSFzX9laF9M';
         window.bjdSite = BJDPage.connect(SUPABASE_URL, SUPABASE_ANON_KEY);
     </script>
-    <script src="status.js"></script>
+    <script src="receipt-ui.js?v=cards-v1"></script>
+    <script src="status.js?v=cards-v1"></script>
 </body>
 </html>
