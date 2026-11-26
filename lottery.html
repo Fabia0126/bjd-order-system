@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>开单开奖台</title>
+<link rel="stylesheet" href="lottery.css?v=2">
+<script src="vendor/supabase-js-2.118.0.js"></script>
+</head>
+<body>
+<main id="app">
+  <section id="login" class="card" hidden>
+    <h1>开单开奖台</h1>
+    <form id="loginForm">
+      <label for="email">邮箱</label><input id="email" type="email" autocomplete="username" required>
+      <label for="password">密码</label><input id="password" type="password" autocomplete="current-password" required>
+      <button type="submit">登录</button>
+      <p id="loginMsg" class="msg" role="status"></p>
+    </form>
+  </section>
+
+  <section id="main" hidden>
+    <header class="bar">
+      <h1>开单开奖台</h1>
+      <div class="bar-right"><span id="who"></span><button id="logout" class="ghost" type="button">退出</button></div>
+    </header>
+
+    <div class="card">
+      <h2>批次</h2>
+      <div class="row">
+        <label for="campaignSel">选择批次</label>
+        <select id="campaignSel"></select>
+        <button id="reload" class="ghost" type="button">刷新</button>
+      </div>
+      <p id="campaignInfo" class="muted"></p>
+      <details>
+        <summary>新建 / 修改批次（有人投递后就不能改）</summary>
+        <form id="campaignForm" class="grid">
+          <label for="cId">批次名</label><input id="cId" placeholder="1128" required pattern="[A-Za-z0-9_-]{1,20}">
+          <label for="cOpen">开放时间（东八区）</label><input id="cOpen" type="datetime-local" step="1" required>
+          <label for="cWin">窗口秒数</label><input id="cWin" type="number" min="1" max="600" value="5" required>
+          <label for="qp">普：手速/选抽/摇号</label><input id="qp" value="3/1/2" required pattern="\d+/\d+/\d+">
+          <label for="qc">钞：手速/选抽/摇号</label><input id="qc" value="3/1/2" required pattern="\d+/\d+/\d+">
+          <button type="submit">保存批次</button>
+        </form>
+      </details>
+    </div>
+
+    <div id="pools"></div>
+
+    <div class="card">
+      <h2>三倍钞（翻倍直送）</h2>
+      <div id="triple"></div>
+    </div>
+
+    <div class="card">
+      <h2>开奖后清理</h2>
+      <p class="muted">把这一批未中签的人资料清掉，只留闲鱼 ID 和手机后四位，并删除他们上传的参考图。不可撤销。</p>
+      <button id="purge" class="danger" type="button">清理本批未中签资料</button>
+      <p id="purgeMsg" class="msg" role="status"></p>
+    </div>
+  </section>
+
+  <div id="confirmBox" class="modal" hidden>
+    <div class="modal-card">
+      <p id="confirmText"></p>
+      <div class="row"><button id="confirmOk" type="button">确定</button><button id="confirmNo" class="ghost" type="button">取消</button></div>
+    </div>
+  </div>
+</main>
+<script src="lottery-config.js"></script>
+<script src="lottery.js?v=1"></script>
+</body>
+</html>
