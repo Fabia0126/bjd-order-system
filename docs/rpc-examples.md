@@ -52,3 +52,12 @@
 - 在途收件：窗口内投递、事务里 sleep 到关窗后才提交；关窗后 confirm_win+lock_pool 等它提交，M 把它算进去（lottery_pos=3）
 - 3 个并发确认手速：手速总数仍为 3；3 个并发 draw 结果完全一致，同时换号 draw → already_drawn；正式号 5 个唯一
 - 上传：v0.2 计数法 10 并发进了 7 张（超限，已废弃）；v0.5 槽位法 10 并发（含越界 7/8、重复）最终 6 张，第二张票传已占槽位 400
+
+## v0.6 / v0.6b + 冻结版 migration-v1（2026-11-26 20:05 CST）
+- 封批：第一次 confirm_win 或 lock_pool 时拿独占收件锁、写 campaigns.sealed_at；submit_entry 拿到共享锁后**重新读批次**，sealed_at 不为空就明确返回 closed（不会悄悄漏收）
+- upsert_campaign：拿同一把独占锁；开放时间一到 / 已封批 / 已有投递 → campaign_started
+- 图片：won 状态在原 30 分钟内可领票补图；attach 时若已有 order_id 同步 orders.reference_images；can_upload 同时核对 entry 当前状态与 upload_until；reject_entry 撤票；状态变 not_selected 时触发器立刻撤票
+- request_upload 额外返回 occupied：[{path,size,etag}]，供前台判断已占用槽位（是否据此自动恢复由前台决定，不能只凭路径）
+- migration-v1.sql = v0.1→v0.6b 顺序拼接，sha256 前缀 015d1c4548826c71；测试库已 reset → baseline（复刻线上旧策略）→ migration-v1 从零重建
+- regress-v1.py：重建后 24 项全过（投递/重放/冲突/凭据格式/窗口内确认/开放后改批次/关窗/手速前N/封批/超额/选抽/锁池/开奖/落选旧票失效/通过后补图并同步正式单/拒绝后旧票失效/匿名读 401）
+- 未覆盖：在 submit_entry 取共享锁**之前**注入延迟的边界（函数内无法注入，靠代码审读：拿锁后重读 sealed_at）
