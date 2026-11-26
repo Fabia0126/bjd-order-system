@@ -148,7 +148,10 @@
                     showCountdown = true;
                     open = now >= start && now < end;
                     if (now < start) {
-                        waitText = Math.ceil((start - now) / 1000) + ' 秒';
+                        const left = Math.ceil((start - now) / 1000);
+                        const d = Math.floor(left / 86400), h = Math.floor(left % 86400 / 3600), m = Math.floor(left % 3600 / 60), sec = left % 60;
+                        waitText = left >= 3600 ? (d ? d + ' 天 ' : '') + h + ' 小时 ' + m + ' 分 ' + sec + ' 秒'
+                                 : left >= 60 ? m + ' 分 ' + sec + ' 秒' : left + ' 秒';
                         message = '距离开放约 ' + waitText + '，可提前预览小纸条。';
                     }
                     else if (open) message = '正在收件，还剩约 ' + ((end - now) / 1000).toFixed(1) + ' 秒；以服务器收件为准。';
