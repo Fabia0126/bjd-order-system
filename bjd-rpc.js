@@ -95,8 +95,20 @@
 
         receipts() {
             return this.read().filter(item => item.receipt).map(item => ({
-                requestId: item.requestId, token: item.token, pool: item.pool, receipt: item.receipt
+                requestId: item.requestId, token: item.token, pool: item.pool,
+                campaignId: item.campaignId || item.receipt.campaign_id || null, receipt: item.receipt
             }));
+        }
+
+        rememberLookup(token, entry) {
+            const record = this.read().find(item => item.token === token && item.receipt?.entry_id === entry.entry_id);
+            if (!record) return;
+            for (const key of ['status', 'order_id', 'order_status', 'received_at', 'price', 'demo', 'campaign_id']) {
+                const value = entry[key];
+                if (value === null || ['string', 'boolean', 'number'].includes(typeof value)) record.receipt[key] = value;
+            }
+            if (typeof entry.campaign_id === 'string') record.campaignId = entry.campaign_id;
+            this.save(record);
         }
 
         canPrepareSubmission() {
@@ -154,7 +166,8 @@
             if (pending && pending.fingerprint !== fingerprint) throw failure('pending_request');
             const record = pending || {
                 requestId: uuid(this.crypto), token: randomToken(this.crypto),
-                pool, payload: JSON.parse(JSON.stringify(payload)), fingerprint, state: 'submitting'
+                pool, campaignId: typeof payload.campaign_id === 'string' ? payload.campaign_id : null,
+                payload: JSON.parse(JSON.stringify(payload)), fingerprint, state: 'submitting'
             };
             record.state = 'submitting';
             // Persist before the first network call. A lost response or reload

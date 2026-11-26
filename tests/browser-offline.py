@@ -87,7 +87,7 @@ async def main():
             assert 'status' not in calls[0]['params']['p_payload']
             assert 'total_price' not in calls[0]['params']['p_payload']
             assert calls[0]['params']['p_pool'] == ('三倍钞' if form=='form-3x.html' else '普')
-            assert await page.locator('#submissionReceipt input[readonly]').count() == 1
+            assert await page.locator('#submissionReceipt textarea[readonly]').count() == 1
             assert not await page.evaluate('window.__xss')
             checks.append(form+': preview text, RPC-only, one submit, private credential')
 
@@ -112,7 +112,7 @@ async def main():
         await page.reload()
         await page.wait_for_function('bjdForm.status !== null')
         await page.get_by_role('button',name='恢复原投递',exact=True).click()
-        await page.wait_for_selector('#submissionReceipt input[readonly]')
+        await page.wait_for_selector('#submissionReceipt textarea[readonly]')
         second = await page.evaluate('window.__calls.find(x=>x.name === "submit_entry").params')
         assert first == second
         checks.append('lost response + reload: original ID, token and payload recovered')

@@ -43,6 +43,15 @@ practice rather than formal orders. A `DEMO-` order identifier also provides a
 fallback label for completed demo records. Without the server flags, a pre-draw
 demo cannot be reliably distinguished; campaign-name guesses are not used.
 
+`receipt-ui.js` and `receipt-ui.css` share the buyer-facing state badges and card
+theme across lookup and submission receipts. Local record cards use the most
+recent known metadata; clicking a card looks up its current state. Successful
+lookups update only whitelisted receipt metadata, never the private payload.
+Legacy records without a saved campaign display a pending-lookup label until
+queried. Credential text wraps visually but copying preserves the exact raw token.
+Image supplement controls show confirmed binding counts and become read-only
+after binding. Keep these shared assets with both form pages and the lookup page.
+
 `frontend-security.js` provides DOM image previews, HTML text / quoted-attribute
 escaping, fixed upload-slot validation, and CSV formula protection. HTML escaping
 does not make interpolated JavaScript or arbitrary URLs safe. Prefer DOM listeners
@@ -69,6 +78,7 @@ node --test tests/*.test.cjs
 python3 tests/browser-offline.py
 python3 tests/form-environment-offline.py
 python3 tests/direct-submit-offline.py
+python3 tests/receipt-cards-offline.py
 ```
 
 Browser checks require Playwright with Chromium. They intercept every request and

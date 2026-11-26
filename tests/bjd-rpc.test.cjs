@@ -12,6 +12,16 @@ function fixture(rpc, overrides = {}) {
 const payload = { campaign_id: 'fixture', size: '3fen', makeup: 'free', xianyu_id: '虚构单主' };
 const receipt = { ok: true, entry_id: 'fixture-entry', status: 'received', price: 190 };
 
+test('Local receipt cards remember campaign and queried status without keeping private payload', async () => {
+    const f = fixture(async () => ({ data:receipt }));
+    const result = await f.client.submit('普',payload);
+    assert.equal(f.client.receipts()[0].campaignId,'fixture');
+    f.client.rememberLookup(result.token,{entry_id:receipt.entry_id,campaign_id:'fixture',status:'won',order_status:'working',
+        order_id:'BJD-fixture',payload:{doll_info:'private-doll'}});
+    assert.equal(f.client.receipts()[0].receipt.order_status,'working');
+    assert.equal(JSON.stringify(f.client.read()).includes('private-doll'),false);
+});
+
 test('Missing secure hashing rejects locally without pretending to preserve a pending send', async () => {
     let count = 0;
     const f = fixture(async () => { count++; return { data: receipt }; }, { crypto: { getRandomValues: crypto.getRandomValues.bind(crypto) } });

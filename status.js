@@ -4,6 +4,7 @@
     const button = document.getElementById('queryButton');
     const result = document.getElementById('resultSection');
     const saved = document.getElementById('savedReceipts');
+    const localSection = document.getElementById('localReceipts');
     const rpc = window.bjdSite.rpc;
     const statuses = Object.freeze({
         received: '已收件，等待开奖', reviewing: '三倍钞审核中', won: '已中签／审核通过',
@@ -27,7 +28,7 @@
     }
     function line(parent, label, value) {
         const row = node('div', undefined, 'info-row');
-        row.append(node('span', label, 'info-label'), node('span', value, 'info-value'));
+        row.append(node('span', label, 'info-label'), node('span', value === null || value === undefined || value === '' ? '—' : value, 'info-value'));
         parent.append(row);
     }
     function showMessage(text) {
@@ -40,12 +41,14 @@
         const card = node('section', undefined, 'order-result');
         const heading = node('div', undefined, 'result-header');
         heading.append(node('span', entry.order_id || (demo ? '演练回执 · 非正式订单' : '投递回执 · 尚无正式编号'), 'result-id'),
-            node('span', (demo ? '演练 · ' : '') + statuses[entry.status], 'result-status'));
+            BJDReceiptUI.badges(entry));
+        heading.lastChild.classList.add('result-status');
         card.append(heading);
         if (demo) card.append(node('p', '这是演练记录，不参与正式开单，不生成BJD正式编号。'));
         line(card, '类别', entry.pool);
-        line(card, '服务器收件时间', time(entry.received_at));
-        line(card, '服务器计价', Number.isFinite(entry.price) ? '¥' + entry.price : '待确认');
+        line(card, '批次', entry.campaign_id || (entry.pool === '三倍钞' ? '独立审核' : '待确认'));
+        line(card, '收件时间', time(entry.received_at));
+        line(card, '计价金额', Number.isFinite(entry.price) ? '¥' + entry.price : '待确认');
         if (!demo && entry.status === 'won' && Object.hasOwn(orderStatuses, entry.order_status)) {
             line(card, '订单进度', orderStatuses[entry.order_status]);
         }
@@ -80,25 +83,40 @@
         }
         busy = true;
         button.disabled = true;
+        button.textContent = '正在查询…';
+        saved.querySelectorAll('button').forEach(b => { b.disabled = true; });
         showMessage('正在查询这笔投递…');
         try {
             const entry = await rpc.lookup(token);
-            if (input.value.trim() === token) render(entry);
+            if (input.value.trim() === token) {
+                render(entry);
+                try { rpc.rememberLookup(token, entry); renderSaved(token); } catch { /* Query results remain visible if local storage is unavailable. */ }
+            }
             else showMessage('查询凭据已改变，请重新查询。');
         } catch (error) {
             showMessage(error.safeCode ? error.message : '查询暂时不可用，请稍后重试。');
-        } finally { busy = false; button.disabled = false; }
+        } finally {
+            busy = false; button.disabled = false; button.textContent = '查询订单';
+            saved.querySelectorAll('button').forEach(b => { b.disabled = false; });
+        }
     }
     button.addEventListener('click', search);
     input.addEventListener('keydown', event => { if (event.key === 'Enter') search(); });
-    try {
+    function renderSaved(selectedToken) {
+        saved.replaceChildren();
         const records = rpc.receipts();
-        for (const record of records) {
-            const option = node('option', (record.pool || '投递') + ' · ' + time(record.receipt.received_at));
-            option.value = record.token;
-            saved.append(option);
+        for (const record of [...records].reverse()) {
+            const item = node('button', undefined, 'record-item'); item.type = 'button'; item.disabled = busy;
+            const selected = record.token === selectedToken;
+            item.classList.toggle('is-selected', selected); item.setAttribute('aria-pressed', String(selected));
+            const top = node('span', undefined, 'record-top');
+            top.append(node('span', (record.campaignId || (record.pool === '三倍钞' ? '独立审核' : '批次待查询')) + ' · ' + (record.pool || '投递'), 'record-name'),
+                BJDReceiptUI.badges(record.receipt));
+            item.append(top, node('span', time(record.receipt.received_at) + ' 收件', 'record-time'));
+            item.addEventListener('click', () => { if (!busy) { input.value = record.token; search(); } });
+            saved.append(item);
         }
-        saved.hidden = records.length === 0;
-        saved.addEventListener('change', () => { input.value = saved.value; });
-    } catch { saved.hidden = true; }
+        localSection.hidden = records.length === 0;
+    }
+    try { renderSaved(); } catch { localSection.hidden = true; }
 })();
