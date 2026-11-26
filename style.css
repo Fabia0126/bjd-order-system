@@ -409,6 +409,28 @@ input[type="file"]:hover {
     font-weight: 500;
 }
 
+.preview-btn {
+    display: block;
+    width: 100%;
+    margin-top: 12px;
+    padding: 12px 16px;
+    border: 1px solid #e8e0eb;
+    border-radius: 10px;
+    background: #f5f0ff;
+    color: #8b5a7b;
+    font: inherit;
+    cursor: pointer;
+}
+
+.preview-live-status {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 8px 0;
+    background: #fff;
+    color: #8b5a7b;
+}
+
 .submit-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;

@@ -13,6 +13,10 @@
             this.form = options.form;
             this.getSavedImages = options.getSavedImages;
             this.onComplete = options.onComplete;
+            this.onOpen = options.onOpen || (() => {});
+            this.wasAvailable = false;
+            this.availableKey = null;
+            this.refreshing = null;
             this.status = null;
             this.busy = false;
             this.serverBase = null;
@@ -56,24 +60,54 @@
             return { pool, payload };
         }
 
-        async refresh() {
-            try {
-                const data = await this.site.rpc.campaignStatus();
-                const stamp = Date.parse(data.server_time);
-                if (!Number.isFinite(stamp) || typeof data.triple_open !== 'boolean') throw new Error();
-                this.status = data;
-                this.serverBase = stamp;
-                this.clockBase = performance.now();
-            } catch { this.status = null; }
-            this.updateAvailability();
+        refresh() {
+            if (this.refreshing) return this.refreshing;
+            clearTimeout(this.poll);
+            this.poll = null;
+            this.refreshing = (async () => {
+                const sent = performance.now();
+                try {
+                    const data = await this.site.rpc.campaignStatus();
+                    const returned = performance.now();
+                    const stamp = Date.parse(data.server_time);
+                    if (!Number.isFinite(stamp) || typeof data.triple_open !== 'boolean') throw new Error();
+                    this.status = data;
+                    this.serverBase = stamp;
+                    this.clockBase = (sent + returned) / 2;
+                } catch { this.status = null; }
+                this.updateAvailability();
+            })().finally(() => { this.refreshing = null; this.schedulePoll(); });
+            return this.refreshing;
+        }
+
+        pollInterval() {
+            if (!this.status) return 3000;
+            const campaign = this.status.campaign;
+            if (!campaign || this.pool() === '三倍钞') return 5000;
+            const now = this.serverBase + performance.now() - this.clockBase;
+            const until = Date.parse(campaign.open_at) - now;
+            if (until <= 10000 && now < Date.parse(campaign.close_at)) return 1000;
+            return until > 0 && until <= 120000 ? 3000 : 5000;
+        }
+
+        schedulePoll() {
+            if (!this.timer || this.refreshing || document.hidden) return;
+            const delay = this.pollInterval();
+            const due = performance.now() + delay;
+            if (this.poll && due >= this.pollAt) return;
+            clearTimeout(this.poll);
+            this.pollAt = due;
+            this.poll = setTimeout(() => { this.poll = null; this.refresh(); }, delay);
         }
 
         start() {
             if (this.timer) return;
+            this.timer = setInterval(() => this.updateAvailability(), 50);
             this.refresh();
-            this.timer = setInterval(() => this.updateAvailability(), 100);
-            this.poll = setInterval(() => { if (!document.hidden) this.refresh(); }, 15000);
-            document.addEventListener('visibilitychange', () => { if (!document.hidden) this.refresh(); });
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden) this.refresh();
+                else { clearTimeout(this.poll); this.poll = null; }
+            });
             try {
                 const pending = this.site.rpc.pending();
                 if (pending) {
@@ -98,6 +132,7 @@
             const text = document.getElementById('countdownText');
             let open = false;
             let showCountdown = false;
+            let waitText = '';
             let message = '正在核对活动状态，可先填写资料。';
             const pool = this.pool();
             if (this.status && pool === '三倍钞') {
@@ -111,7 +146,10 @@
                 if (Number.isFinite(start) && Number.isFinite(end) && end > start) {
                     showCountdown = true;
                     open = now >= start && now < end;
-                    if (now < start) message = '距离开放约 ' + Math.ceil((start - now) / 1000) + ' 秒，可提前核对预览。';
+                    if (now < start) {
+                        waitText = Math.ceil((start - now) / 1000) + ' 秒';
+                        message = '距离开放约 ' + waitText + '，可提前预览小纸条。';
+                    }
                     else if (open) message = '正在收件，还剩约 ' + ((end - now) / 1000).toFixed(1) + ' 秒；以服务器收件为准。';
                     else message = '本次收件已结束，已投递者请凭查询凭据查看进度。';
                 }
@@ -125,19 +163,30 @@
             if (text) text.textContent = message;
             if (countdown) countdown.style.display = showCountdown ? 'block' : 'none';
             const agreed = document.getElementById('agreeNotice').checked;
-            // Preview may be prepared before opening. Only its confirm action
-            // submits; the database, not the local countdown, decides admission.
-            button.disabled = maintenance || !environmentReady || this.busy || !agreed || !this.status || (!this.status.campaign && pool !== '三倍钞');
+            const available = open && !maintenance && environmentReady;
+            const key = pool + ':' + (this.status?.campaign?.id || '');
+            if (available && (!this.wasAvailable || this.availableKey !== key)) this.onOpen();
+            this.wasAvailable = available;
+            this.availableKey = key;
+            button.disabled = !available || this.busy || !agreed;
             button.textContent = !environmentReady ? '请使用HTTPS链接投递'
-                : (maintenance ? '维护中，暂不收件' : (this.busy ? '正在提交…' : (open ? '核对并投递小纸条' : '提前核对小纸条')));
-            const confirm = document.querySelector('.btn-confirm');
-            if (confirm) {
-                let pending = false;
-                try { pending = !!this.site.rpc.pending(); } catch { /* RPC saves before sending. */ }
-                confirm.disabled = maintenance || !environmentReady || this.busy || (!open && !pending);
-                confirm.textContent = !environmentReady ? '请使用HTTPS链接投递'
-                    : (maintenance ? '维护中，暂不收件' : (this.busy ? '正在提交…' : (open || pending ? '确认投递' : '等待开放／本次已结束')));
+                : (this.busy ? '正在提交…' : (maintenance ? '维护中，暂不收件'
+                    : (waitText ? '确认投递 · ' + waitText + '后开放' : '确认投递')));
+            for (const live of document.querySelectorAll('.preview-live-status')) live.textContent = message;
+            this.schedulePoll();
+            return { available };
+        }
+
+        async submitCurrent() {
+            if (this.busy || !this.updateAvailability().available || !this.form.reportValidity()) return;
+            let snapshot;
+            try { snapshot = this.snapshot(); }
+            catch (error) {
+                this.panel.hidden = false;
+                this.panel.replaceChildren(element('p', error.message));
+                return;
             }
+            await this.submit(snapshot);
         }
 
         imageFiles() {
@@ -191,7 +240,19 @@
             } catch (error) {
                 if (receipt) {
                     this.imageNote.textContent = '文字已收件，参考图尚未确认绑定。请保留此回执，在截止前重试补图。';
-                } else alert(error.safeCode ? error.message : (snapshot ? '投递暂未确认，请使用恢复原投递，不要重新创建。' : error.message));
+                } else {
+                    this.panel.hidden = false;
+                    this.panel.replaceChildren(element('h2', '投递状态'), element('p', error.safeCode ? error.message
+                        : (snapshot ? '投递暂未确认，请使用恢复原投递，不要重新创建。' : error.message)));
+                    try {
+                        if (this.site.rpc.pending()) {
+                            const resume = element('button', '恢复原投递');
+                            resume.type = 'button';
+                            resume.addEventListener('click', () => this.submit(null, true));
+                            this.panel.append(resume);
+                        }
+                    } catch { /* The displayed error remains useful without storage. */ }
+                }
             } finally { this.busy = false; this.updateAvailability(); }
         }
 

@@ -56,6 +56,7 @@ let savedImages = [];
 const bjdForm = new BJDForm.Controller(bjdSite, {
     form,
     getSavedImages: () => savedImages,
+    onOpen: () => closePreview(),
     onComplete: () => {
         closePreview();
         window.currentOrderData = null;
@@ -71,6 +72,7 @@ const bjdForm = new BJDForm.Controller(bjdSite, {
 
 function saveDraft() {
     const data = {};
+    data.agreeNotice = agreeNotice.checked;
     data.size = document.querySelector('input[name="size"]:checked')?.value;
     data.makeupType = document.querySelector('input[name="makeupType"]:checked')?.value;
     data.dollInfo = form.querySelector('[name="dollInfo"]').value;
@@ -101,6 +103,7 @@ function loadDraft() {
     if (!raw) return;
     try {
         const data = JSON.parse(raw);
+        agreeNotice.checked = data.agreeNotice === true;
         if (data.size) {
             const radio = form.querySelector(`input[name="size"][value="${data.size}"]`);
             if (radio) radio.checked = true;
@@ -325,18 +328,15 @@ function updateMakeupHint() {
     makeupHintEl.textContent = MAKEUP_HINTS[makeupType];
 }
 
-function handleSubmit(e) {
+async function handleSubmit(e) {
     e.preventDefault();
+    await bjdForm.submitCurrent();
+}
 
-    if (!agreeNotice.checked) {
-        alert('请先阅读并同意注意事项');
-        return;
-    }
+function previewOrder() {
 
     const formData = new FormData(form);
     const data = {};
-    try { data.rpcSnapshot = bjdForm.snapshot(); }
-    catch (error) { alert(error.message); return; }
 
 
     data.orderType = '三倍超';
@@ -391,7 +391,7 @@ function handleSubmit(e) {
 
 function generateTextVersion(data) {
     let text = `【送妆小纸条】
-序号：（待确认后生成）
+序号：（中签／审核通过后生成）
 订单类别：${data.orderType}
 尺寸：${data.size}
 妆面类别：${data.makeupType}
@@ -423,24 +423,26 @@ function generateTextVersion(data) {
 }
 
 function showPreview(data, textVersion) {
+    closePreview();
     const modal = document.createElement('div');
     modal.className = 'preview-modal';
     modal.innerHTML = `
         <div class="preview-content">
             <h2>小纸条预览</h2>
-            <p class="preview-note">请确认信息无误后提交</p>
+            <p class="preview-note">仅供查看和复制；投递请使用页面底部“确认投递”</p>
+            <p class="preview-live-status"></p>
             <div class="preview-text">
                 <pre></pre>
             </div>
             <div class="preview-actions">
                 <button class="btn-copy" onclick="copyText()">复制文字版</button>
-                <button class="btn-confirm" onclick="confirmSubmit()">确认提交</button>
                 <button class="btn-cancel" onclick="closePreview()">返回修改</button>
             </div>
         </div>
     `;
 
     BJDSecurity.setText(modal.querySelector('.preview-text pre'), textVersion);
+    BJDSecurity.setText(modal.querySelector('.preview-live-status'), document.getElementById('countdownText').textContent);
 
     const style = document.createElement('style');
     style.textContent = `
@@ -520,24 +522,19 @@ function showPreview(data, textVersion) {
     window.currentTextVersion = textVersion;
 }
 
-function copyText() {
-    navigator.clipboard.writeText(window.currentTextVersion).then(() => {
-        alert('已复制到剪贴板！');
-    }).catch(() => {
+async function copyText() {
+    let copied = false;
+    try { await navigator.clipboard.writeText(window.currentTextVersion); copied = true; }
+    catch {
         const textarea = document.createElement('textarea');
         textarea.value = window.currentTextVersion;
         document.body.appendChild(textarea);
         textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
-        alert('已复制到剪贴板！');
-    });
-}
-
-async function confirmSubmit() {
-    const snapshot = window.currentOrderData?.rpcSnapshot;
-    if (!snapshot) { alert('请重新核对小纸条。'); return; }
-    await bjdForm.submit(snapshot);
+        try { copied = document.execCommand('copy'); } catch {}
+        textarea.remove();
+    }
+    const note = document.querySelector('.preview-note');
+    if (note) note.textContent = copied ? '已复制文字版' : '复制未成功，请选中文字复制';
 }
 
 function closePreview() {

@@ -43,7 +43,8 @@ async def main():
             if scheme=='http':
                 assert not caps['secure'] and not caps['sha']
                 assert result[scheme]['submission_calls']==0 and not result[scheme]['pending_exists']
-                assert len(alerts)==1 and 'HTTPS' in alerts[0] and '尚未发送' in alerts[0]
+                status=await page.locator('#submissionReceipt').inner_text()
+                assert not alerts and 'HTTPS' in status and '尚未发送' in status
                 assert await page.locator('#submitBtn').is_disabled()
             else:
                 assert caps['secure'] and caps['sha'] and result[scheme]['submission_calls']==1 and not alerts
