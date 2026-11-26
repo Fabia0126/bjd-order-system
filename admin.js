@@ -112,7 +112,7 @@ function updateLastSyncTime() {
         document.getElementById('orderList').after(el);
     }
     const now = new Date();
-    el.textContent = `最后同步: ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
+    const p = CST_PARTS(now); el.textContent = `最后同步: ${p.hour}:${p.minute}:${p.second}`;
 }
 
 async function manualRefresh() {
@@ -217,14 +217,18 @@ function renderOrders(filter = 'all') {
     `).join('');
 }
 
+
+// 所有时间一律按东八区显示，不看电脑时区
+const CST_PARTS = (d) => Object.fromEntries(new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
+    .formatToParts(d).filter(p => p.type !== 'literal').map(p => [p.type, p.value]));
+const pad2 = (x) => String(x).padStart(2, '0');
+const toCstInput = (d) => { const p = CST_PARTS(d); return `${p.year}-${pad2(p.month)}-${pad2(p.day)}T${p.hour}:${p.minute}`; };
+const fromCstInput = (v) => new Date(v + (v.length === 16 ? ':00' : '') + '+08:00');
+const cstFull = (d) => { const p = CST_PARTS(d); return `${p.year}/${p.month}/${p.day} ${p.hour}:${p.minute}:${p.second}`; };
 function formatTime(timeStr) {
     if (!timeStr) return '';
-    const date = new Date(timeStr);
-    const month = date.getMonth() + 1;
-    const day = date.getDate();
-    const hours = String(date.getHours()).padStart(2, '0');
-    const mins = String(date.getMinutes()).padStart(2, '0');
-    return `${month}/${day} ${hours}:${mins}`;
+    const p = CST_PARTS(new Date(timeStr));
+    return `${p.month}/${p.day} ${p.hour}:${p.minute}`;
 }
 
 function updateStats() {
@@ -362,7 +366,7 @@ function editWorkStartTime(id, currentTime) {
     const existingDialog = document.querySelector('.date-edit-overlay');
     if (existingDialog) existingDialog.remove();
 
-    const defaultVal = currentTime ? new Date(currentTime).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16);
+    const defaultVal = toCstInput(currentTime ? new Date(currentTime) : new Date());
 
     const overlay = document.createElement('div');
     overlay.className = 'date-edit-overlay';
@@ -388,7 +392,7 @@ async function confirmWorkStartTime(id) {
     try {
         const { error } = await supabaseClient
             .from('orders')
-            .update({ work_start_time: new Date(input.value).toISOString(), last_update: new Date().toISOString() })
+            .update({ work_start_time: fromCstInput(input.value).toISOString(), last_update: new Date().toISOString() })
             .eq('id', id);
         if (error) throw error;
         if (overlay) overlay.remove();
@@ -483,7 +487,7 @@ async function openSettings() {
 
     if (settings.normal_open_time) {
         const dt = new Date(settings.normal_open_time);
-        document.getElementById('normalOpenTime').value = dt.toISOString().slice(0, 16);
+        document.getElementById('normalOpenTime').value = toCstInput(dt);
     } else {
         document.getElementById('normalOpenTime').value = '';
     }
@@ -537,7 +541,7 @@ function updateTimerStatus() {
         const dt = new Date(timeVal);
         const now = new Date();
         if (dt > now) {
-            statusEl.textContent = '当前状态：已关闭，将于 ' + dt.toLocaleString('zh-CN') + ' 自动开放';
+            statusEl.textContent = '当前状态：已关闭，将于 ' + cstFull(dt) + ' 自动开放';
             statusEl.style.color = '#996600';
         } else {
             statusEl.textContent = '定时已过期，请更新时间或手动开放';
@@ -554,7 +558,7 @@ async function saveSettings() {
     const settings = {
         normal_open: document.getElementById('normalOn').classList.contains('active'),
         normal_limit: parseInt(document.getElementById('normalLimit').value) || 0,
-        normal_open_time: timeVal ? new Date(timeVal).toISOString() : null,
+        normal_open_time: timeVal ? fromCstInput(timeVal).toISOString() : null,
         premium_open: document.getElementById('premiumOn').classList.contains('active'),
         premium_3x_open: document.getElementById('premium3xOn').classList.contains('active'),
         updated_at: new Date().toISOString()
@@ -612,7 +616,7 @@ function exportOrders() {
         o.total_price,
         o.deposit_paid ? '已付' : '未付',
         o.final_paid ? '已付' : '未付',
-        o.submit_time ? new Date(o.submit_time).toLocaleString('zh-CN') : ''
+        o.submit_time ? cstFull(new Date(o.submit_time)) : ''
     ]);
 
     const csvContent = window.BJDSecurity.csvDocument(headers, rows);
