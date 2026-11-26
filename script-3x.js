@@ -1,9 +1,9 @@
 // Supabase配置
 const SUPABASE_URL = 'https://assqothmzcsusnksdnmm.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFzc3FvdGhtemNzdXNua3Nkbm1tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzMzMwODEsImV4cCI6MjA5MzkwOTA4MX0.2OxbVdQQBANlv5_vmxitzR5CG79FrD3VPSFzX9laF9M';
-const supabaseClient = (typeof supabase !== 'undefined' && supabase.createClient)
-    ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-    : window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const bjdSite = BJDPage.connect(SUPABASE_URL, SUPABASE_ANON_KEY);
+window.bjdSite = bjdSite;
+const supabaseClient = bjdSite.client;
 
 // 价格配置
 const PRICES = {
@@ -53,6 +53,21 @@ const koupeiQty = document.getElementById('koupeiQty');
 const DRAFT_KEY = 'bjd_order_draft_3x';
 const IMG_KEY = 'bjd_order_images_3x';
 let savedImages = [];
+const bjdForm = new BJDForm.Controller(bjdSite, {
+    form,
+    getSavedImages: () => savedImages,
+    onComplete: () => {
+        closePreview();
+        window.currentOrderData = null;
+        try { clearDraft(); localStorage.removeItem(IMG_KEY); } catch {}
+        savedImages = [];
+        renderImagePreview();
+        form.reset();
+        agreeNotice.checked = false;
+        updatePrice();
+        updateConditionalFields();
+    }
+});
 
 function saveDraft() {
     const data = {};
@@ -147,34 +162,8 @@ document.addEventListener('DOMContentLoaded', () => {
     form.addEventListener('change', saveDraft);
 });
 
-let isPremiumOpen = true;
-
-async function checkPremiumStatus() {
-    try {
-        const { data: settings, error } = await supabaseClient
-            .from('settings')
-            .select('premium_3x_open')
-            .eq('id', 1)
-            .single();
-
-        if (error) throw error;
-
-        isPremiumOpen = settings.premium_3x_open !== false;
-        updateSubmitButton();
-    } catch (error) {}
-}
-
-function updateSubmitButton() {
-    const agreed = agreeNotice.checked;
-
-    if (!isPremiumOpen) {
-        submitBtn.disabled = true;
-        submitBtn.textContent = '三倍超暂停接单';
-    } else {
-        submitBtn.disabled = !agreed;
-        submitBtn.textContent = '提交小纸条';
-    }
-}
+function checkPremiumStatus() { bjdForm.start(); }
+function updateSubmitButton() { bjdForm.updateAvailability(); }
 
 function setupEventListeners() {
     // 尺寸变化
@@ -259,16 +248,7 @@ function loadSavedImages() {
 function renderImagePreview() {
     const preview = document.getElementById('imagePreview');
     if (!preview) return;
-    if (savedImages.length === 0) {
-        preview.innerHTML = '';
-        return;
-    }
-    preview.innerHTML = savedImages.map((img, i) => `
-        <div style="position:relative;display:inline-block;">
-            <img src="${img.data}" style="width:60px;height:60px;object-fit:cover;border-radius:8px;border:1px solid #e8e0eb;">
-            <span onclick="removeImage(${i})" style="position:absolute;top:-6px;right:-6px;width:18px;height:18px;background:#dc3545;color:white;border-radius:50%;font-size:12px;line-height:18px;text-align:center;cursor:pointer;">×</span>
-        </div>
-    `).join('');
+    BJDSecurity.renderImagePreview(preview, savedImages, removeImage);
 }
 
 function removeImage(index) {
@@ -355,6 +335,9 @@ function handleSubmit(e) {
 
     const formData = new FormData(form);
     const data = {};
+    try { data.rpcSnapshot = bjdForm.snapshot(); }
+    catch (error) { alert(error.message); return; }
+
 
     data.orderType = '三倍超';
     data.size = formData.get('size') === '3fen' ? '三分' : '四分';
@@ -447,7 +430,7 @@ function showPreview(data, textVersion) {
             <h2>小纸条预览</h2>
             <p class="preview-note">请确认信息无误后提交</p>
             <div class="preview-text">
-                <pre>${textVersion}</pre>
+                <pre></pre>
             </div>
             <div class="preview-actions">
                 <button class="btn-copy" onclick="copyText()">复制文字版</button>
@@ -456,6 +439,8 @@ function showPreview(data, textVersion) {
             </div>
         </div>
     `;
+
+    BJDSecurity.setText(modal.querySelector('.preview-text pre'), textVersion);
 
     const style = document.createElement('style');
     style.textContent = `
@@ -550,143 +535,9 @@ function copyText() {
 }
 
 async function confirmSubmit() {
-    const data = window.currentOrderData;
-    if (!data) {
-        alert('数据错误，请重新填写');
-        closePreview();
-        return;
-    }
-
-    const confirmBtn = document.querySelector('.btn-confirm');
-    const cancelBtn = document.querySelector('.btn-cancel');
-    if (confirmBtn) {
-        confirmBtn.disabled = true;
-        confirmBtn.textContent = '正在提交...';
-    }
-    if (cancelBtn) cancelBtn.disabled = true;
-
-    // 提交前检查开关
-    try {
-        const { data: settings } = await supabaseClient
-            .from('settings').select('premium_3x_open').eq('id', 1).single();
-        if (settings && settings.premium_3x_open === false) {
-            alert('三倍超暂停接单，请稍后再试');
-            if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = '确认提交'; }
-            if (cancelBtn) cancelBtn.disabled = false;
-            closePreview();
-            return;
-        }
-    } catch (e) {}
-
-    const orderData = {
-        status: 'pending',
-        order_type: '三倍超',
-        size: data.size,
-        makeup_type: data.makeupType,
-        doll_info: data.dollInfo,
-        attribute: data.attribute,
-        gender: data.gender,
-        color_scheme: data.colorScheme,
-        taboos: data.taboos || [],
-        requirements: data.requirements || [],
-        addons: data.addons || [],
-        free_items: data.freeItems || [],
-        glitter: data.glitter,
-        accessories: data.accessories,
-        xianyu_id: data.xianyuId,
-        receiver_name: data.receiverName,
-        contact1: data.contact1,
-        contact2: data.contact2,
-        shipping: data.shipping,
-        total_price: data.totalPrice
-    };
-
-    try {
-        const fileInput = document.querySelector('input[name="referenceImages"]');
-        const hasNewFiles = fileInput && fileInput.files.length > 0;
-        const hasSavedImages = savedImages.length > 0;
-
-        if (hasNewFiles || hasSavedImages) {
-            if (confirmBtn) confirmBtn.textContent = '正在上传图片...';
-            const imageUrls = [];
-
-            if (hasNewFiles) {
-                for (const file of fileInput.files) {
-                    const ext = file.name.split('.').pop();
-                    const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-                    const { error: uploadError } = await supabaseClient.storage
-                        .from('reference-images')
-                        .upload(fileName, file);
-                    if (!uploadError) {
-                        const { data: urlData } = supabaseClient.storage
-                            .from('reference-images')
-                            .getPublicUrl(fileName);
-                        imageUrls.push(urlData.publicUrl);
-                    }
-                }
-            } else if (hasSavedImages) {
-                for (const img of savedImages) {
-                    const resp = await fetch(img.data);
-                    const blob = await resp.blob();
-                    const ext = img.name.split('.').pop() || 'jpg';
-                    const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-                    const { error: uploadError } = await supabaseClient.storage
-                        .from('reference-images')
-                        .upload(fileName, blob);
-                    if (!uploadError) {
-                        const { data: urlData } = supabaseClient.storage
-                            .from('reference-images')
-                            .getPublicUrl(fileName);
-                        imageUrls.push(urlData.publicUrl);
-                    }
-                }
-            }
-
-            if (imageUrls.length > 0) {
-                orderData.reference_images = imageUrls;
-            }
-        }
-
-        if (confirmBtn) confirmBtn.textContent = '正在提交...';
-
-        const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('提交超时，请检查网络后重试')), 20000)
-        );
-
-        const insertPromise = supabaseClient
-            .from('orders')
-            .insert([orderData])
-            .select();
-
-        const { data: result, error } = await Promise.race([insertPromise, timeoutPromise]);
-
-        if (error) throw error;
-
-        if (!result || result.length === 0) {
-            throw new Error('服务器未返回确认数据，订单可能未成功提交，请刷新后检查');
-        }
-
-        alert('提交成功！\n\n订单已提交，请等待店主审核确认。\n确认后会生成订单编号，届时请凭编号去闲鱼拍万能拍。\n\n您可以在"订单查询"页面用联系方式查看订单状态。');
-
-        closePreview();
-        clearDraft();
-        savedImages = [];
-        try { localStorage.removeItem(IMG_KEY); } catch(e) {}
-        document.getElementById('imagePreview').innerHTML = '';
-
-        document.getElementById('orderForm').reset();
-        document.getElementById('agreeNotice').checked = false;
-        document.getElementById('submitBtn').disabled = true;
-        updatePrice();
-    } catch (error) {
-        console.error('提交失败:', error);
-        alert('提交失败，请稍后重试\n\n错误信息: ' + (error.message || '网络错误'));
-        if (confirmBtn) {
-            confirmBtn.disabled = false;
-            confirmBtn.textContent = '确认提交';
-        }
-        if (cancelBtn) cancelBtn.disabled = false;
-    }
+    const snapshot = window.currentOrderData?.rpcSnapshot;
+    if (!snapshot) { alert('请重新核对小纸条。'); return; }
+    await bjdForm.submit(snapshot);
 }
 
 function closePreview() {

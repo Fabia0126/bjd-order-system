@@ -184,14 +184,15 @@
     <div class="container">
         <header>
             <h1>订单查询</h1>
-            <p class="subtitle">输入闲鱼ID或联系方式查询订单状态</p>
+            <p class="subtitle">凭投递成功后保存的查询凭据查看本人的进度</p>
         </header>
 
         <div class="search-section">
             <h2>查询我的订单</h2>
-            <input type="text" class="search-input" id="searchInput" placeholder="输入闲鱼ID或手机号">
-            <button class="search-btn" onclick="searchOrder()">查询</button>
-            <p class="search-hint">请输入下单时填写的闲鱼ID或联系方式</p>
+            <select id="savedReceipts" aria-label="选择本设备保存的投递" hidden><option value="">选择本设备保存的投递</option></select>
+            <input type="text" class="search-input" id="searchInput" placeholder="粘贴43位查询凭据" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="43">
+            <button class="search-btn" id="queryButton" type="button">查询</button>
+            <p class="search-hint">查询凭据仅供本人保存；旧订单请联系阿发核验。</p>
         </div>
 
         <div class="result-section" id="resultSection">
@@ -202,231 +203,15 @@
         <a href="index.html" class="back-link">← 返回首页</a>
     </div>
 
+    <script src="runtime-config.js"></script>
+    <script src="frontend-security.js"></script>
+    <script src="bjd-rpc.js"></script>
+    <script src="bjd-site.js"></script>
     <script>
-        // Supabase配置
         const SUPABASE_URL = 'https://assqothmzcsusnksdnmm.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFzc3FvdGhtemNzdXNua3Nkbm1tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzMzMwODEsImV4cCI6MjA5MzkwOTA4MX0.2OxbVdQQBANlv5_vmxitzR5CG79FrD3VPSFzX9laF9M';
-        const supabaseClient = (typeof supabase !== 'undefined' && supabase.createClient)
-            ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-            : window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-        const STATUS = {
-            pending: '待审核',
-            approved: '等待中',
-            working: '正在施工',
-            packing: '已确认待打包',
-            completed: '订单完成',
-            rejected: '已拒绝'
-        };
-
-        async function searchOrder() {
-            const keyword = document.getElementById('searchInput').value.trim();
-            if (!keyword) {
-                alert('请输入闲鱼ID或联系方式');
-                return;
-            }
-
-            try {
-                const { data: results, error } = await supabaseClient
-                    .from('orders')
-                    .select('*')
-                    .or(`xianyu_id.eq.${keyword},contact1.eq.${keyword},contact2.eq.${keyword},order_id.eq.${keyword}`);
-
-                if (error) throw error;
-                searchResults = results || [];
-
-            const resultSection = document.getElementById('resultSection');
-            resultSection.classList.add('show');
-
-            if (results.length === 0) {
-                resultSection.innerHTML = `
-                    <div class="no-result">
-                        <p>未找到相关订单</p>
-                        <p style="font-size: 13px; margin-top: 8px;">请确认输入的信息与下单时一致</p>
-                    </div>
-                `;
-                return;
-            }
-
-            resultSection.innerHTML = results.map(order => `
-                <div class="order-result">
-                    <div class="result-header">
-                        <span class="result-id">${order.order_id || '编号待生成'}</span>
-                        <span class="result-status status-${order.status}">${STATUS[order.status]}</span>
-                    </div>
-                    <div class="result-info">
-                        <div class="info-row">
-                            <span class="info-label">订单类别</span>
-                            <span class="info-value">${order.order_type}</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-label">妆面类别</span>
-                            <span class="info-value">${order.makeup_type}</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-label">娃头信息</span>
-                            <span class="info-value">${order.doll_info}</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-label">总价</span>
-                            <span class="info-value" style="color: #d485a8; font-weight: 600;">${order.total_price}</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-label">提交时间</span>
-                            <span class="info-value">${formatTime(order.submit_time)}</span>
-                        </div>
-                        ${order.work_start_time ? `<div class="info-row">
-                            <span class="info-label">开始施工</span>
-                            <span class="info-value">${formatTime(order.work_start_time)}</span>
-                        </div>` : ''}
-                    </div>
-                    ${order.status === 'rejected' ? `
-                    <div class="reject-reason-box">
-                        <div class="reason-label">拒绝理由</div>
-                        <div class="reason-text">${order.reject_reason || '未填写理由'}</div>
-                    </div>
-                    <button class="resubmit-btn" onclick="resubmitOrder('${order.id}')">修改并重新投递</button>
-                    ` : order.order_id ? `
-                    <div class="receipt-box">
-                        <h3>回执小纸条（可复制）</h3>
-                        <pre class="receipt-text">${generateReceipt(order)}</pre>
-                        <button class="copy-btn" onclick="copyReceipt('${order.id}')">复制回执</button>
-                    </div>
-                    ` : `
-                    <div class="receipt-box" style="background: #fff8e6;">
-                        <p style="color: #856404; text-align: center;">订单待审核中，审核通过后将生成编号和回执</p>
-                    </div>
-                    `}
-                </div>
-            `).join('');
-            } catch (error) {
-                console.error('查询失败:', error);
-                resultSection.innerHTML = `
-                    <div class="no-result">
-                        <p>查询失败，请稍后重试</p>
-                    </div>
-                `;
-            }
-        }
-
-        function formatTime(timeStr) {
-            const date = new Date(timeStr);
-            return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-        }
-
-        function generateReceipt(order) {
-            let text = `【送妆小纸条】
-序号：${order.order_id}
-订单类别：${order.order_type}
-尺寸：${order.size}
-妆面类别：${order.makeup_type}
-娃社+官名+肤色：${order.doll_info}
-属性：${order.attribute}
-性别：${order.gender}
-色系：${order.color_scheme}`;
-
-            if (order.taboos && order.taboos.length > 0) {
-                text += `\n禁忌：${order.taboos.join('、')}`;
-            }
-            if (order.requirements && order.requirements.length > 0) {
-                text += `\n要求：${order.requirements.join('、')}`;
-            }
-
-            text += `\n加购项：${order.addons && order.addons.length > 0 ? order.addons.join('、') : '无'}`;
-            text += `\n免费项：${order.free_items && order.free_items.length > 0 ? order.free_items.join('、') : '自由发挥'}`;
-            text += `\n闪粉：${order.glitter}`;
-            text += `\n随箱物品：${order.accessories || '无'}`;
-            text += `\n闲鱼ID：${order.xianyu_id}`;
-            text += `\n收件人：${order.receiver_name}`;
-            text += `\n联系方式：${order.contact1} / ${order.contact2}`;
-            text += `\n快递：${order.shipping}`;
-            text += `\n\n总价：${order.total_price}`;
-
-            return text;
-        }
-
-        // 存储查询结果供复制使用
-        let searchResults = [];
-
-        async function copyReceipt(orderId) {
-            let order = searchResults.find(o => o.id === orderId);
-            if (!order) {
-                try {
-                    const { data, error } = await supabaseClient
-                        .from('orders')
-                        .select('*')
-                        .eq('id', orderId)
-                        .single();
-                    if (error || !data) {
-                        alert('找不到订单数据，请重新查询');
-                        return;
-                    }
-                    order = data;
-                } catch (e) {
-                    alert('获取订单失败，请重新查询');
-                    return;
-                }
-            }
-
-            const text = generateReceipt(order);
-            try {
-                await navigator.clipboard.writeText(text);
-                alert('回执已复制！请去闲鱼拍万能拍时备注订单编号');
-            } catch (e) {
-                const textarea = document.createElement('textarea');
-                textarea.value = text;
-                textarea.style.position = 'fixed';
-                textarea.style.opacity = '0';
-                document.body.appendChild(textarea);
-                textarea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textarea);
-                alert('回执已复制！请去闲鱼拍万能拍时备注订单编号');
-            }
-        }
-
-        function resubmitOrder(orderId) {
-            const order = searchResults.find(o => o.id === orderId);
-            if (!order) return;
-
-            const makeupTypeMap = { '全自由妆': 'free', '指定妆': 'specified', 'COS妆': 'cos' };
-            const sizeMap = { '三分': '3fen', '四分': '4fen' };
-            const orderTypeMap = { '普单': 'normal', '钞能力单': 'chao' };
-
-            const draft = {
-                orderType: orderTypeMap[order.order_type] || 'normal',
-                size: sizeMap[order.size] || '3fen',
-                makeupType: makeupTypeMap[order.makeup_type] || 'free',
-                dollInfo: order.doll_info || '',
-                attribute: order.attribute || '',
-                gender: order.gender || '男养',
-                colorScheme: order.color_scheme || '自由发挥',
-                taboo1: (order.taboos && order.taboos[0]) || '',
-                taboo2: (order.taboos && order.taboos[1]) || '',
-                taboo3: (order.taboos && order.taboos[2]) || '',
-                requirement1: (order.requirements && order.requirements[0]) || '',
-                requirement2: (order.requirements && order.requirements[1]) || '',
-                requirement3: (order.requirements && order.requirements[2]) || '',
-                addons: order.addons || [],
-                koupeiQty: '1',
-                freeItems: order.free_items || [],
-                glitter: order.glitter || '否',
-                accessories: order.accessories || '',
-                xianyuId: order.xianyu_id || '',
-                receiverName: order.receiver_name || '',
-                contact1: order.contact1 || '',
-                contact2: order.contact2 || '',
-                shipping: order.shipping || '顺丰到付'
-            };
-
-            localStorage.setItem('bjd_order_draft', JSON.stringify(draft));
-            window.location.href = 'form.html?resubmit=1';
-        }
-
-        // 支持回车查询
-        document.getElementById('searchInput').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') searchOrder();
-        });
+        window.bjdSite = BJDPage.connect(SUPABASE_URL, SUPABASE_ANON_KEY);
     </script>
+    <script src="status.js"></script>
 </body>
 </html>

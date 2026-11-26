@@ -6,6 +6,11 @@
     <title>BJD送妆小纸条</title>
     <link rel="stylesheet" href="style.css">
     <script src="vendor/supabase-js-2.118.0.js"></script>
+    <script src="runtime-config.js"></script>
+    <script src="frontend-security.js"></script>
+    <script src="bjd-rpc.js"></script>
+    <script src="bjd-site.js"></script>
+    <script src="form-rpc.js"></script>
 </head>
 <body>
     <div class="container">
@@ -13,7 +18,7 @@
         <a href="weather.html" style="display:block;text-align:center;background:linear-gradient(135deg,#87ceeb 0%,#f0e68c 100%);color:#5a4a2a;padding:12px;border-radius:10px;text-decoration:none;font-size:14px;font-weight:500;margin-bottom:12px;">☀️ 查看晴天日历 — 工期按晴天计算</a>
         <header>
             <h1>BJD送妆小纸条</h1>
-            <p class="subtitle">填写完成后请截图/复制，凭订单编号去闲鱼拍万能拍</p>
+            <p class="subtitle">先投递文字取得查询凭据，再补参考图；中签或审核通过后才生成正式编号</p>
         </header>
 
         <form id="orderForm">
@@ -38,7 +43,7 @@
                         <input type="radio" name="orderType" value="chao">
                         <span class="card-content">
                             <span class="card-title">钞能力单</span>
-                            <span class="card-desc">基础价×2，满额时可加塞</span>
+                            <span class="card-desc">基础价×2，参与独立钞池开奖</span>
                         </span>
                     </label>
                 </div>
@@ -310,6 +315,6 @@
         </form>
     </div>
 
-    <script src="script.js?v=8"></script>
+    <script src="script.js?v=rpc-v02"></script>
 </body>
 </html>
