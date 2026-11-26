@@ -1,6 +1,7 @@
 // 开单开奖台：只走管理员 RPC，所有页面文字用 textContent，不拼 HTML
 (() => {
   const cfg = window.LOTTERY_CONFIG;
+  const linkType = (new URLSearchParams(location.hash.slice(1))).get('type');   // 邀请/找回密码链接，客户端处理前先记下
   const sb = window.supabase.createClient(cfg.url, cfg.anonKey);
   const $ = (id) => document.getElementById(id);
   const ERR = {
@@ -28,6 +29,9 @@
 
   async function boot() {
     const { data: { session } } = await sb.auth.getSession();
+    if (session && (linkType === 'invite' || linkType === 'recovery') && !sessionStorage.getItem('pwset')) {
+      $('login').hidden = true; $('main').hidden = true; $('setpw').hidden = false; return;
+    }
     if (!session) { $('login').hidden = false; $('main').hidden = true; return; }
     let admin = false; try { admin = await rpc('is_admin'); } catch (e) {}
     if (!admin) { $('login').hidden = false; $('main').hidden = true; say($('loginMsg'), '这个账号不是管理员'); await sb.auth.signOut(); return; }
@@ -41,6 +45,16 @@
     $('password').value = '';
     if (error) return say($('loginMsg'), '邮箱或密码不对');
     say($('loginMsg'), ''); boot();
+  });
+  $('setpwForm').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    if ($('pw1').value !== $('pw2').value) return say($('setpwMsg'), '两次输入不一样');
+    const { error } = await sb.auth.updateUser({ password: $('pw1').value });
+    $('pw1').value = $('pw2').value = '';
+    if (error) return say($('setpwMsg'), errText(error));
+    try { sessionStorage.setItem('pwset', '1'); } catch (e) {}
+    history.replaceState(null, '', location.pathname);
+    $('setpw').hidden = true; boot();
   });
   $('logout').onclick = async () => { await sb.auth.signOut(); location.reload(); };
 
