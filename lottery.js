@@ -38,6 +38,7 @@
     let admin = false; try { admin = await rpc('is_admin'); } catch (e) {}
     if (!admin) { $('login').hidden = false; $('main').hidden = true; say($('loginMsg'), '这个账号不是管理员'); await sb.auth.signOut(); return; }
     $('login').hidden = true; $('main').hidden = false; $('who').textContent = session.user.email;
+    await syncClock();
     await loadCampaigns();
   }
 
@@ -58,6 +59,21 @@
     history.replaceState(null, '', location.pathname);
     $('setpw').hidden = true; boot();
   });
+  $('otpForm').addEventListener('submit', async (ev) => {
+    ev.preventDefault(); say($('otpMsg'), '验证中…');
+    const email = $('otpEmail').value.trim(), token = $('otpCode').value.trim();
+    let r = await sb.auth.verifyOtp({ email, token, type: 'invite' });
+    if (r.error) r = await sb.auth.verifyOtp({ email, token, type: 'email' });
+    $('otpCode').value = '';
+    if (r.error) return say($('otpMsg'), '验证码不对或已过期');
+    say($('otpMsg'), '');
+    $('login').hidden = true; $('setpw').hidden = false;      // 第一次用验证码进来，先设密码
+  });
+  $('otpSend').onclick = async () => {
+    const email = $('otpEmail').value.trim(); if (!email) return say($('otpMsg'), '先填邮箱');
+    const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
+    say($('otpMsg'), error ? '发送失败，稍后再试' : '验证码已发到邮箱', !error);
+  };
   $('logout').onclick = async () => { $('main').hidden = true; $('pools').replaceChildren(); $('triple').replaceChildren(); try { await sb.auth.signOut(); } finally { location.reload(); } };
 
   async function loadCampaigns() {
@@ -85,11 +101,33 @@
   });
   function alertInline(node, text) { node.textContent = text; }
 
+  // 倒计时：用服务器时间校准，不信本机时钟
+  let skew = 0, tick = null;
+  async function syncClock() {
+    try { const t0 = Date.now(); const d = await rpc('campaign_status'); const t1 = Date.now();
+      skew = new Date(d.server_time).getTime() - (t0 + t1) / 2; } catch (e) {}
+  }
+  function startCountdown(c) {
+    if (tick) clearInterval(tick);
+    const el = $('countdown'); if (!c) { el.textContent = ''; return; }
+    const open = new Date(c.open_at).getTime(), close = open + c.window_seconds * 1000;
+    const f = (ms) => { const s = Math.max(0, Math.ceil(ms / 1000)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
+      return (h ? h + ':' : '') + String(m).padStart(2, '0') + ':' + String(x).padStart(2, '0'); };
+    const step = () => {
+      const now = Date.now() + skew;
+      if (now < open) { el.className = 'countdown'; el.textContent = `距开放还有 ${f(open - now)}`; }
+      else if (now < close) { el.className = 'countdown live'; el.textContent = `投递中，还剩 ${f(close - now)}`; }
+      else { el.className = 'countdown'; el.textContent = '投递已结束，可以开始确认手速（先点“刷新”）'; clearInterval(tick); tick = null; }
+    };
+    step(); tick = setInterval(step, 200);
+  }
+
   async function render() {
     const my = ++gen;
     cur = campaigns.find(c => c.id === $('campaignSel').value) || campaigns[0] || null;
     const c = cur;
     $('pools').replaceChildren();
+    startCountdown(cur);
     if (!cur) { $('campaignInfo').textContent = '还没有批次，先在下面新建一个'; await renderTriple(); return; }
     const close = new Date(new Date(cur.open_at).getTime() + cur.window_seconds * 1000);
     $('campaignInfo').textContent = `开放 ${fmt(cur.open_at)} → 关闭 ${fmt(close)}（${cur.window_seconds} 秒）` +
@@ -134,16 +172,22 @@
       else if (r.rank <= q.speed) tr.className = 'top';
       const kind = r.win_type ? el('span', { className: 'pill ' + r.win_type, textContent: { speed: '手速', pick: '选抽', lottery: '摇中' }[r.win_type] || r.win_type })
         : r.status === 'not_selected' ? el('span', { className: 'pill out', textContent: '未中签' }) : '';
+      const tg = el('button', { type: 'button', className: 'ghost', textContent: '小纸条' });
+      tg.style.padding = '2px 8px';
       [r.rank, r.xianyu_id, fmt(r.received_at).slice(11), '¥' + r.price, r.lottery_pos || '', kind, r.order_id || '']
         .forEach(v => tr.append(el('td', {}, v === '' ? '' : (v instanceof Node ? v : String(v)))));
+      tr.append(el('td', {}, tg));
+      const noteTr = el('tr', { hidden: true }); noteTr.className = 'note-row';
+      noteTr.append(el('td', { colSpan: 8 }, noteView(r)));
+      tg.onclick = (ev) => { ev.stopPropagation(); noteTr.hidden = !noteTr.hidden; tg.textContent = noteTr.hidden ? '小纸条' : '收起'; };
       if (!lock && !r.win_type && r.status === 'received' && pickDone < q.pick) {
         tr.style.cursor = 'pointer';
         tr.onclick = () => { picked = r; [...tbody.children].forEach(x => x.style.outline = ''); tr.style.outline = '2px solid var(--dai)';
           bPick.disabled = false; bPick.textContent = `② 确认选抽：${r.xianyu_id}`; };
       }
-      tbody.append(tr);
+      tbody.append(tr, noteTr);
     });
-    const thead = el('thead', {}, el('tr', {}, ...['名次', '闲鱼 ID', '收到时间', '价格', '摇号序号', '结果', '正式编号'].map(h => el('th', { textContent: h }))));
+    const thead = el('thead', {}, el('tr', {}, ...['名次', '闲鱼 ID', '收到时间', '价格', '摇号序号', '结果', '正式编号', ''].map(h => el('th', { textContent: h }))));
     card.append(el('div', { className: 'tablewrap' }, el('table', {}, thead, tbody)));
 
     bSpeed.onclick = async () => {
@@ -165,6 +209,17 @@
 
     if (lock) card.append(sheet(cid, pool, rows, lock), drawBox(cid, pool, lock));
     return card;
+  }
+
+  // 小纸条：全部用 textContent
+  function noteView(r) {
+    const n = r.note || {}, j = (a) => (Array.isArray(a) && a.length ? a.join('、') : '无');
+    const rows = [['尺寸', n.size_label], ['妆面', n.makeup_label], ['娃社+官名+肤色', n.doll_info], ['属性', n.attribute], ['性别', n.gender],
+      ['色系', n.color_scheme], ['禁忌', j(n.taboos)], ['要求', j(n.requirements)], ['加购', j(n.addons) + (n.koupei_qty ? `（口配×${n.koupei_qty}）` : '')],
+      ['免费项', j(n.free_items)], ['闪粉', n.glitter], ['随箱物品', n.accessories], ['参考图', (r.images || 0) + ' 张']];
+    const dl = el('dl', { className: 'note' });
+    rows.forEach(([k, v]) => dl.append(el('dt', { textContent: k }), el('dd', { textContent: v == null || v === '' ? '—' : String(v) })));
+    return dl;
   }
 
   // 公布用名单：只有序号和闲鱼 ID

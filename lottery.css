@@ -52,3 +52,9 @@ tr.out td{color:var(--soft)}
 .modal-card{background:var(--card);border-radius:8px;padding:18px;max-width:420px;width:100%;display:flex;flex-direction:column;gap:12px}
 details summary{cursor:pointer;color:var(--dai);font-size:14px;margin-top:8px}
 @media (max-width:520px){.sheet ol{columns:1}}
+
+.countdown{font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;margin:8px 0 0;color:var(--dai)}
+.countdown.live{color:var(--zhu)}
+.note-row td{background:var(--bg);white-space:normal}
+.note{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:4px 0;font-size:13px}
+.note dt{color:var(--soft)} .note dd{margin:0;min-width:0;overflow-wrap:anywhere}
