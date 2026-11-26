@@ -96,6 +96,7 @@
     try {
       await rpc('upsert_campaign', { p_id: $('cId').value.trim(), p_open_at: openAt, p_window: Number($('cWin').value),
         p_quotas: { '普': q($('qp').value), '钞': q($('qc').value) } });
+      await rpc('set_campaign_demo', { p_id: $('cId').value.trim(), p_demo: $('cDemo').checked });
       $('campaignSel').value = $('cId').value.trim(); await loadCampaigns();
     } catch (e) { alertInline($('campaignInfo'), errText(e)); }
   });
@@ -130,7 +131,8 @@
     startCountdown(cur);
     if (!cur) { $('campaignInfo').textContent = '还没有批次，先在下面新建一个'; await renderTriple(); return; }
     const close = new Date(new Date(cur.open_at).getTime() + cur.window_seconds * 1000);
-    $('campaignInfo').textContent = `开放 ${fmt(cur.open_at)} → 关闭 ${fmt(close)}（${cur.window_seconds} 秒）` +
+    $('purgeDemo').hidden = !cur.demo;
+    $('campaignInfo').textContent = (cur.demo ? '【演练批次，不占正式编号】' : '') + `开放 ${fmt(cur.open_at)} → 关闭 ${fmt(close)}（${cur.window_seconds} 秒）` +
       (cur.lottery_number ? ` · 开奖号 ${cur.lottery_number}` : '');
     const cards = [];
     for (const pool of ['普', '钞']) cards.push(await poolCard(c, pool));
@@ -294,6 +296,20 @@
       el('thead', {}, el('tr', {}, ...['闲鱼 ID', '收到时间', '价格', '操作'].map(h => el('th', { textContent: h })))), tbody)));
   }
 
+  $('purgeDemo').onclick = async () => {
+    const cid = cur && cur.id;
+    if (!cid || !cur.demo || !(await ask(`清空演练批次 ${cid}：所有投递的资料和图片都删掉？`))) return;
+    try {
+      const r = await rpc('purge_demo', { p_campaign: cid });
+      const paths = r.delete_paths || []; let removed = 0;
+      for (let i = 0; i < paths.length; i += 50) {
+        const { data, error } = await sb.storage.from('reference-images').remove(paths.slice(i, i + 50));
+        if (error) throw error; removed += (data || []).length;
+      }
+      say($('purgeMsg'), `演练批次已清空：${r.purged} 单，删图 ${removed}/${paths.length} 张`, removed === paths.length);
+      render();
+    } catch (e) { say($('purgeMsg'), errText(e)); }
+  };
   $('purge').onclick = async () => {
     const cid = cur && cur.id;
     if (!cid || !(await ask(`清理批次 ${cid} 所有未中签的资料和图片？不可撤销。`))) return;

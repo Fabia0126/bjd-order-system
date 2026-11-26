@@ -58,3 +58,4 @@ details summary{cursor:pointer;color:var(--dai);font-size:14px;margin-top:8px}
 .note-row td{background:var(--bg);white-space:normal}
 .note{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:4px 0;font-size:13px}
 .note dt{color:var(--soft)} .note dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.chk{display:flex;gap:6px;align-items:center;color:var(--ink);font-size:14px}

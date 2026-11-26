@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex">
 <title>开单开奖台</title>
-<link rel="stylesheet" href="lottery.css?v=4">
+<link rel="stylesheet" href="lottery.css?v=5">
 <script src="vendor/supabase-js-2.118.0.js"></script>
 </head>
 <body>
@@ -63,6 +63,7 @@
           <label for="cWin">窗口秒数</label><input id="cWin" type="number" min="1" max="600" value="5" required>
           <label for="qp">普：手速/选抽/摇号</label><input id="qp" value="3/1/2" required pattern="\d+/\d+/\d+">
           <label for="qc">钞：手速/选抽/摇号</label><input id="qc" value="3/1/2" required pattern="\d+/\d+/\d+">
+          <label for="cDemo">演练批次</label><label class="chk"><input id="cDemo" type="checkbox"> 是（中签发 DEMO 编号，不进正式订单）</label>
           <button type="submit">保存批次</button>
         </form>
       </details>
@@ -79,6 +80,7 @@
       <h2>开奖后清理</h2>
       <p class="muted">把这一批未中签的人资料清掉，只留闲鱼 ID 和手机后四位，并删除他们上传的参考图。不可撤销。</p>
       <button id="purge" class="danger" type="button">清理本批未中签资料</button>
+      <button id="purgeDemo" class="danger" type="button" hidden>清空整个演练批次</button>
       <p id="purgeMsg" class="msg" role="status"></p>
     </div>
   </section>
@@ -92,6 +94,6 @@
 </main>
 <script src="runtime-config.js"></script>
 <script src="admin-config.js"></script>
-<script src="lottery.js?v=6"></script>
+<script src="lottery.js?v=7"></script>
 </body>
 </html>
