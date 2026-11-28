@@ -28,7 +28,16 @@
             <label class="visually-hidden" for="searchInput">查询凭据</label>
             <input type="text" class="search-input" id="searchInput" placeholder="粘贴43位查询凭据" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="43">
             <button class="search-btn" id="queryButton" type="button">查询订单</button>
-            <p class="search-hint">查询凭据仅供本人保存；旧订单请联系阿发核验。</p>
+            <p class="search-hint">查询凭据仅供本人保存；11月28日以前的旧订单请用下方手机号查询。</p>
+        </div>
+
+        <div class="search-section legacy-section">
+            <p class="receipt-eyebrow">旧订单</p>
+            <h2>11月28日以前的订单</h2>
+            <label class="visually-hidden" for="legacyPhone">下单时留的手机号</label>
+            <input type="tel" class="search-input" id="legacyPhone" placeholder="输入下单时留的11位手机号" autocomplete="off" inputmode="numeric" maxlength="20">
+            <button class="search-btn" id="legacyButton" type="button">用手机号查询</button>
+            <p class="search-hint">只显示订单编号和进度。新投递请用上面的查询凭据。</p>
         </div>
 
         <div class="result-section" id="resultSection">
@@ -49,6 +58,6 @@
         window.bjdSite = BJDPage.connect(SUPABASE_URL, SUPABASE_ANON_KEY);
     </script>
     <script src="receipt-ui.js?v=cards-v1"></script>
-    <script src="status.js?v=cards-v1"></script>
+    <script src="status.js?v=legacy-v1"></script>
 </body>
 </html>

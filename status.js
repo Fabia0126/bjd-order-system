@@ -70,7 +70,7 @@
             });
             card.append(copy);
         }
-        card.append(node('p', '需要修改资料或查询旧订单，请联系阿发核验处理。', 'search-hint'));
+        card.append(node('p', '需要修改资料，请联系阿发核验处理。', 'search-hint'));
         result.classList.add('show');
         result.replaceChildren(card);
     }
@@ -102,6 +102,57 @@
     }
     button.addEventListener('click', search);
     input.addEventListener('keydown', event => { if (event.key === 'Enter') search(); });
+
+    // 11/28 之前的旧订单：凭下单时留的完整手机号查进度（只返回编号和进度）
+    const legacyInput = document.getElementById('legacyPhone');
+    const legacyButton = document.getElementById('legacyButton');
+    const LEGACY_ERRORS = Object.freeze({
+        invalid_phone: '请输入下单时留的完整11位手机号。',
+        rate_limited: '查询太频繁了，请过十分钟再试。'
+    });
+    function renderLegacy(orders) {
+        if (!Array.isArray(orders)) throw new Error('invalid_response');
+        if (orders.length === 0) {
+            showMessage('没有查到这个手机号的旧订单。当时可能留的是别的号码或QQ、微信号，请联系阿发核验。');
+            return;
+        }
+        const cards = orders.map(order => {
+            const card = node('section', undefined, 'order-result');
+            const heading = node('div', undefined, 'result-header');
+            heading.append(node('span', order.order_id, 'result-id'),
+                node('span', orderStatuses[order.status] || '处理中', 'result-status'));
+            card.append(heading);
+            line(card, '订单进度', orderStatuses[order.status] || '处理中');
+            if (order.work_start_time) line(card, '开工时间', time(order.work_start_time));
+            line(card, '最后更新', time(order.last_update));
+            return card;
+        });
+        cards.at(-1).append(node('p', '需要修改资料，请联系阿发核验处理。', 'search-hint'));
+        result.classList.add('show');
+        result.replaceChildren(...cards);
+    }
+    async function searchLegacy() {
+        if (busy) return;
+        const phone = legacyInput.value.replace(/\D/g, '');
+        if (!/^1\d{10}$/.test(phone)) { showMessage(LEGACY_ERRORS.invalid_phone); return; }
+        busy = true;
+        legacyButton.disabled = true;
+        legacyButton.textContent = '正在查询…';
+        showMessage('正在查询旧订单…');
+        try {
+            const { data, error } = await rpc.client.rpc('lookup_legacy_order', { p_phone: phone });
+            if (error) {
+                const code = String(error.message || '');
+                showMessage(LEGACY_ERRORS[code] || '查询暂时不可用，请稍后重试。');
+            } else renderLegacy(data && data.orders);
+        } catch {
+            showMessage('查询暂时不可用，请稍后重试。');
+        } finally {
+            busy = false; legacyButton.disabled = false; legacyButton.textContent = '用手机号查询';
+        }
+    }
+    legacyButton.addEventListener('click', searchLegacy);
+    legacyInput.addEventListener('keydown', event => { if (event.key === 'Enter') searchLegacy(); });
     function renderSaved(selectedToken) {
         saved.replaceChildren();
         const records = rpc.receipts();
